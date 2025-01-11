@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <!-- basic -->
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- mobile metas -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+  <!-- site metas -->
+  <title>ETConnect</title>
+  <meta name="keywords"
+    content="ETConnect, TP Technology Enabling Center, Temasek Polytechnic, VR, ETC, ETC meetiing booking, TP VR, Temasek Polytechnic Virtual Realitys">
+  <meta name="description" content="description"
+    content="ETConnect is a meeting room booking platform developed in collaboration with Temasek Polytechnic's Technology Enabling Center (TP TEC). This platform facilitates efficient booking and management of meeting spaces within the ETC.">
+  <meta name="author" content="Hiran Wijeratne">
+
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css"
+    integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css"
+    integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- adding a favicon to the tab -->
+  <link rel="icon" href="/images/new-tab-img.png" type="image/x-icon">
+</head>
+
+<body>
+  <body>
+    <div class="container mt-5">
+      <div class="mt-5"></div>
+      <% if (locals.messages && locals.messages.length > 0) { %>
+        <% messages.forEach(function(message) { %>
+          <div class="mt-5"></div>
+          <div class="alert-login alert-danger">
+            <%= message %>
+          </div>
+          <div class="mt-5"></div>
+        <% }) %>
+      <% } %>
+  
+      <h1 class="about_taital">Login</h1>
+  
+      <div class="row">
+        <div class="col-sm-8">
+          <div class="card">
+            <div class="card-body">
+              <form action="/login" method="POST">
+                <div class="form-group">
+                  <label for="username">Username</label>
+                  <input type="text" autocomplete="off" class="form-control" name="username" placeholder="username">
+                </div>
+                <div class="form-group">
+                  <label for="password">Password</label>
+                  <input type="password" autocomplete="off" class="form-control" name="password" placeholder="password">
+                </div>
+                <button type="submit" class="btn btn-dark">Login</button>
+              </form>
+  
+              <!-- Do you already have an account section -->
+              <div class="mt-4">
+                <p>Don't have an account? <a href="/register" class="btn btn-link">Sign Up</a></p>
+              </div>
+  
+              <!-- Google Sign-In Option -->
+              <div class="mt-4">
+                <a class="btn btn-block btn-danger" href="/auth/google" role="button">
+                  <i class="fab fa-google"></i> Sign In with Google
+                </a>
+              </div>
+  
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <div class="container mt-5"></div>
+    </div>
+  </body>
+
+
+</html>
+

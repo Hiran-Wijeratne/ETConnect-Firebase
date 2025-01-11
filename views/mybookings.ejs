@@ -1,0 +1,146 @@
+<%- include("partials/header.ejs") %>
+
+</div>
+<div class="container mt-5">
+
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <span id="closeModal" class="close-button">&times;</span>
+          <h2>Edit Booking</h2>
+          <form id="editForm">
+            <input type="hidden" name="booking_id" id="editBookingId">
+            <div>
+              <label for="editDate">Meeting Date:</label>
+              <input type="date" id="editDate" name="date" required>
+            </div>
+            <div>
+              <label for="editStartTime">Start Time:</label>
+              <input type="time" id="editStartTime" name="start_time" required>
+            </div>
+            <div>
+              <label for="editEndTime">End Time:</label>
+              <input type="time" id="editEndTime" name="end_time" required>
+            </div>
+            <button type="submit">Save Changes</button>
+          </form>
+        </div>
+      </div>
+      <div id="overlay" style="display: none;"></div>
+      
+
+
+
+
+    <h1 class="about_taital mt-5">My Upcoming Bookings</h1>
+    <table id="myUpcomingTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <!-- <th>Username</th> -->
+                <th>Meeting Date</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Description</th>
+                <th>Pax</th>
+                <th>Created Date</th>
+                <th>Actions</th>
+
+            </tr>
+        </thead>
+        <tbody>
+            <% upcomingMyBookings.forEach(booking=> { %>
+                <tr>
+                    <td>
+                        <%= booking.booking_id %>
+                    </td>
+                   
+                    <td>
+                        <%= booking.date %>
+                    </td>
+                    <td>
+                        <%= booking.start_time %>
+                    </td>
+                    <td>
+                        <%= booking.end_time %>
+                    </td>
+                    <td>
+                        <%= booking.description %>
+                    </td>
+                    <td>
+                        <%= booking.attendees %>
+                    </td>
+                    <td>
+                        <%= booking.booking_date %>
+                    </td>
+                    <td>
+                        <!-- Action Buttons -->
+                          <button onclick="window.location.href='/edit-booking/<%= booking.booking_id %>'" title="Edit">
+                            <span class="material-icons">edit</span>
+                          </button>
+                         <button onclick="confirmDelete(<%= booking.booking_id %>)" title="Delete">
+                            <span class="material-icons">delete</span>
+                          </button>
+                    </td>
+                </tr>
+                <% }); %>
+        </tbody>
+    </table>
+    <div class="about_bt my-5"><a id="toggleMyPastBookings" style="color: white;">My Past Bookings</a></div>
+    <div id="pastMyBookingsSection" class="mt-5" style="width: 100%; display: none;">
+    <h1 class="about_taital mt-5">My Past Bookings</h1>
+    <table id="myPastTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Meeting Date</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Description</th>
+                <th>Pax</th>
+                <th>Created Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% pastMyBookings.forEach(booking=> { %>
+                <tr>
+                    <td>
+                        <%= booking.booking_id %>
+                    </td>
+                    
+                    <td>
+                        <%= booking.date %>
+                    </td>
+                    <td>
+                        <%= booking.start_time %>
+                    </td>
+                    <td>
+                        <%= booking.end_time %>
+                    </td>
+                    <td>
+                        <%= booking.description %>
+                    </td>
+                    <td>
+                        <%= booking.attendees %>
+                    </td>
+                    <td>
+                        <%= booking.booking_date %>
+                    </td>
+                </tr>
+                <% }); %>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<script>
+    // Function to show a confirmation dialog before deleting
+    function confirmDelete(bookingId) {
+      const userConfirmed = confirm('Are you sure you want to delete this booking? This action cannot be undone.');
+      if (userConfirmed) {
+        // Redirect to the delete route if confirmed
+        window.location.href = `/delete/${bookingId}`;
+      }
+    }
+  </script>
+
+<%- include("partials/footer.ejs") %>

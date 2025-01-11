@@ -1,0 +1,202 @@
+<%- include("partials/header.ejs") %>
+  <!-- header section end -->
+  <!-- banner section start -->
+  <div class="banner_section layout_padding">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-12">
+          <h1 class="banner_taital">Space For Your Ideas</h1>
+          <p id="homePage" class="banner_text">Unlock your creativity by booking the meeting room at the Enabling
+            Technology
+            Collaboratory. Our innovative space is designed for collaboration and brainstorming, allowing you to
+            connect with others and bring your ideas to life. </p>
+          <div id="scrollButton" class="read_bt"><a style="color: white;">Book Now</a></div>
+          <div class="scroll-marker"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- banner section end -->
+  </div>
+  <!-- header section end -->
+  <!-- appointment section start -->
+  <!-- First Form Section -->
+  <div class="appointment_section" id="firstForm">
+    <div class="container">
+      <div class="appointment_box">
+        <div class="row">
+          <div class="col-md-12">
+            <h1 class="appointment_taital">Book <span style="color: #0cb7d6;">The Meeting Room</span></h1>
+          </div>
+        </div>
+        <div class="appointment_section_2">
+          <form action="/submit" method="post" id="appointmentForm">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <p class="doctorname_text">Number of Attendees</p>
+                  <select class="wide" name="attendees">
+                    <option value="">Maximum Attendees</option>
+                    <option value="02">02</option>
+                    <option value="04">04</option>
+                    <option value="06">06</option>
+                    <option value="08">08</option>
+                    <option value="10">10</option>
+                    <option value="12">12</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <p class="doctorname_text_date">Choose Date</p>
+                <input id="datepicker" required autocomplete="off" />
+                <input type="hidden" name="date" id="hiddenDate" hidden required>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <p class="doctorname_text">Purpose of the Meeting</p>
+                <input type="text" class="email_text" placeholder="Meeting Details" name="purpose" required>
+              </div>
+              <div class="col-md-6">
+                <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                <input class="read_bt_next_button" id="nextButton" type="button" value="next">
+              </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Second Form Section (Initially Hidden) -->
+  <div class="appointment_section" id="secondForm" style="display: none;">
+    <div class="container">
+      <div class="appointment_box">
+        <div class="row">
+          <div class="col-md-12">
+            <div class="form-group">
+              <h1 class="appointment_taital">Schedule <span style="color: #0cb7d6;">Your Meeting</span></h1>
+            </div>
+          </div>
+          <div class="appointment_section_2">
+            <div class="container">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <p class="doctorname_text">Start Time</p>
+                    <select class="wide" name="start" required>
+                      <option value="">Select Your Start Time</option>
+                      <option value="08:00:00">08:00</option>
+                      <option value="08:30:00">08:30</option>
+                      <option value="09:00:00">09:00</option>
+                      <option value="09:30:00">09:30</option>
+                      <option value="10:00:00">10:00</option>
+                      <option value="10:30:00">10:30</option>
+                      <option value="11:00:00">11:00</option>
+                      <option value="11:30:00">11:30</option>
+                      <option value="12:00:00">12:00</option>
+                      <option value="12:30:00">12:30</option>
+                      <option value="13:00:00">13:00</option>
+                      <option value="13:30:00">13:30</option>
+                      <option value="14:00:00">14:00</option>
+                      <option value="14:30:00">14:30</option>
+                      <option value="15:00:00">15:00</option>
+                      <option value="15:30:00">15:30</option>
+                      <option value="16:00:00">16:00</option>
+                      <option value="16:30:00">16:30</option>
+                      <option value="17:00:00">17:00</option>
+                      <option value="17:30:00">17:30</option>
+                    </select>
+                </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <p class="doctorname_text">End Time</p>
+                    <select class="wide" name="end" required>
+                      <option value="">Select Your End Time</option>
+                      <option value="08:30:00">08:30</option>
+                      <option value="09:00:00">09:00</option>
+                      <option value="09:30:00">09:30</option>
+                      <option value="10:00:00">10:00</option>
+                      <option value="10:30:00">10:30</option>
+                      <option value="11:00:00">11:00</option>
+                      <option value="11:30:00">11:30</option>
+                      <option value="12:00:00">12:00</option>
+                      <option value="12:30:00">12:30</option>
+                      <option value="13:00:00">13:00</option>
+                      <option value="13:30:00">13:30</option>
+                      <option value="14:00:00">14:00</option>
+                      <option value="14:30:00">14:30</option>
+                      <option value="15:00:00">15:00</option>
+                      <option value="15:30:00">15:30</option>
+                      <option value="16:00:00">16:00</option>
+                      <option value="16:30:00">16:30</option>
+                      <option value="17:00:00">17:00</option>
+                      <option value="17:30:00">17:30</option>
+                      <option value="18:00:00">18:00</option>
+                    </select>
+                </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-8">
+                  <h1 class="doctorname_text_chosen_date">Your selected meeting date is ...</h1>
+                </div>
+                <div class="col-md-12" id="bookingsList">
+                </div>
+                <div class="row">
+                  <div class="col-md-8">
+                    <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                    <h1 class="doctorname_text_chosen_date" style="visibility: hidden;">Your selected meeting date is
+                      ...</h1>
+                  </div>
+                  <div class="col-md-2">
+                    <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                    <input class="read_bt_submit_button" id="backButton" type="button" value="Back">
+                  </div>
+                  <div class="col-md-2">
+                    <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                    <input class="read_bt_submit_button" type="submit" value="Submit">
+                  </div>
+                </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- appointment section end -->
+  <!-- about section start -->
+  <div class="about_section layout_padding">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-6">
+          <h1 class="about_taital">About ETC</h1>
+          <p class="about_text">Welcome to the Enabling Technology Collaboration Center at Temasek Polytechnic!
+            We are a vibrant hub dedicated to innovation, where creativity meets technology.</p>
+          <% if (datesWithTooManyTimeSlots.length> 0) { %>
+            <!-- <div style="text-align: center; background-color: #f44336; color: white; padding: 20px; border-radius: 8px; margin-top: 20px;"> -->
+            <h1 style="font-size: 2.0em;">We are fully booked on:</h1>
+            <ul style="list-style-type: none;">
+              <% datesWithTooManyTimeSlots.forEach(date=> { %>
+                <li style="font-size: 1.2em; margin-right: 50px; display: inline-block;">
+                  <%= date %>
+                </li>
+                <% }); %>
+            </ul>
+            <!-- </div> -->
+            <% } %>
+              <div class="about_bt"><a href="about.html">Read More</a></div>
+        </div>
+        <div class="col-md-6">
+          <div class="about_img"><img src="images/about-img.png"></div>
+        </div>
+      </div>
+    </div>
+    <div class="padding_bottom_index">
+    </div>
+  </div>
+  <!-- about section end -->
+  <%- include("partials/footer.ejs") %>

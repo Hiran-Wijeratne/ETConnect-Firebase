@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- basic -->
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- mobile metas -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+    <!-- site metas -->
+    <title>ETConnect Calendar Page</title>
+    <meta name="keywords"
+        content="ETConnect, TP Technology Enabling Center, Temasek Polytechnic, VR, ETC, ETC meetiing booking, TP VR, Temasek Polytechnic Virtual Realitys">
+    <meta name="description" content="description"
+        content="ETConnect is a meeting room booking platform developed in collaboration with Temasek Polytechnic's Technology Enabling Center (TP TEC). This platform facilitates efficient booking and management of meeting spaces within the ETC.">
+    <meta name="author" content="Hiran Wijeratne">
+
+
+    <!-- styling link section Start -->
+    <!-- bootstrap css -->
+    <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css">
+    <!-- style css -->
+    <link rel="stylesheet" type="text/css" href="/css/style.css">
+    <!-- Responsive-->
+    <link rel="stylesheet" href="/css/responsive.css">
+    <!-- Scrollbar Custom CSS -->
+    <link rel="stylesheet" href="/css/jquery.mCustomScrollbar.min.css">
+    <!-- Tweaks for older IEs-->
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css">
+    <!-- fonts -->
+    <link href="https://fonts.googleapis.com/css?family=Dancing+Script:400,700|Poppins:400,700&display=swap"
+        rel="stylesheet">
+    <!-- owl stylesheets -->
+    <link rel="stylesheet" href="/css/owl.carousel.min.css">
+    <link rel="stylesheet" href="/css/owl.theme.default.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/2.1.5/jquery.fancybox.min.css"
+        media="screen">
+    <!-- Google api link for the location of the enabling center api -->
+    <link href="https://unpkg.com/gijgo@1.9.13/css/gijgo.min.css" rel="stylesheet" type="text/css" />
+    <!-- styling link section end -->
+
+    <!-- Additional Links -->
+    <!-- adding a favicon to the tab -->
+    <link rel="icon" href="/images/new-tab-img.png" type="image/x-icon">
+    <!-- Industry Partners Section Styling -->
+    <!-- dataTable style sheet -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.css">
+    <!-- material icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- fullcalendar -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+    <!-- nice select -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-nice-select/1.1.0/css/nice-select.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
+
+
+
+
+
+
+</head>
+
+<body>
+    <div class="container">
+        <div id="calendarContainer">
+            <!-- <h1>Calendar</h1> -->
+            <div id="calendar"></div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Modal for Event Details -->
+    <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventModalLabel">Booking Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Name:</strong> <span id="modalTitle"></span></p>
+                    <p><strong>Start:</strong> <span id="modalStart"></span></p>
+                    <p><strong>End:</strong> <span id="modalEnd"></span></p>
+                    <p><strong>Attendees:</strong> <span id="modalAttendees"></span></p>
+                    <p><strong>Purpose:</strong> <span id="modalDescription"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let calendarInstance;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Retrieve the upcomingBookings from localStorage
+            const upcomingBookings = <%- JSON.stringify(upcomingBookings) %>;
+            const pastBookings = <%- JSON.stringify(pastBookings) %>;
+
+            if (!upcomingBookings && !pastBookings) {
+                alert("No upcoming or past bookings data found.");
+                return;
+            }
+
+            // Helper function to preprocess bookings
+            function preprocessBookings(bookings, className) {
+                return bookings.map(booking => {
+                    // Convert 'DD-MM-YYYY' to 'YYYY-MM-DD'
+                    const [day, month, year] = booking.date.split('-');
+                    const formattedDate = `${year}-${month}-${day}`;
+
+                    function ensureSeconds(time) {
+                        return time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time;
+                    }
+
+                    const startTimeWithSeconds = ensureSeconds(booking.start_time);
+                    const endTimeWithSeconds = ensureSeconds(booking.end_time);
+
+                    const startDate = new Date(`${formattedDate}T${startTimeWithSeconds}`);
+                    const endDate = new Date(`${formattedDate}T${endTimeWithSeconds}`);
+
+                    return {
+                        title: booking.username,
+                        start: startDate,
+                        end: endDate,
+                        description: booking.description,
+                        attendees: booking.attendees,
+                        className: className, // Assign a CSS class for styling
+                    };
+                });
+            }
+
+            // Process bookings
+            const upcomingEvents = preprocessBookings(upcomingBookings, 'upcoming-booking');
+            const pastEvents = preprocessBookings(pastBookings, 'past-booking');
+
+            // Combine events
+            const allEvents = [...upcomingEvents, ...pastEvents];
+            // If the calendar is already initialized, just show it
+            if (!calendarInstance) {
+                const calendarEl = document.getElementById('calendar');
+                calendarInstance = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    events: allEvents,
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    },
+                    businessHours: {
+                        daysOfWeek: [1, 2, 3, 4, 5], // Monday to Friday (1 = Monday, 5 = Friday)
+                        startTime: '09:00', // Start at 9 AM
+                        endTime: '18:00',   // End at 5 PM
+                    },
+                    hiddenDays: [0, 6], // Hide Sunday (0) and Saturday (6)
+                    slotMinTime: '09:00', // Earliest time displayed
+                    slotMaxTime: '18:00', // Latest time displayed
+                    slotLabelFormat: { // Ensure 24-hour format on time grid views
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    },
+                    eventTimeFormat: { // Display event times in 24-hour format
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    },
+                    eventClick: function (info) {
+                        // Populate the modal with event details
+                        const event = info.event;
+                        $('#modalTitle').text(event.title);
+                        $('#modalStart').text(event.start.toLocaleString());
+                        $('#modalEnd').text(event.end ? event.end.toLocaleString() : 'N/A');
+                        $('#modalAttendees').text(event.extendedProps.attendees || 'No attendees');
+                        $('#modalDescription').text(event.extendedProps.description || 'No description');
+
+                        // Show the modal
+                        $('#eventModal').modal('show');
+                    },
+                    eventContent: function (info) {
+                        // Truncate the title if it's too long
+                        const maxLength = 15; // Maximum length for the title
+                        const fullTitle = info.event.title || 'Unknown';
+                        const shortTitle = fullTitle.length > maxLength ? `${fullTitle.substring(0, maxLength)}...` : fullTitle;
+
+                        const startTime = info.event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const endTime = info.event.end ? info.event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : 'N/A';
+
+                        const content = document.createElement('div');
+                        content.innerHTML = `<strong>${shortTitle}</strong><br>${startTime} - ${endTime}`;
+
+                        // Add a tooltip for the full title
+                        content.title = fullTitle; // Tooltip to show the full title on hover
+
+                        return { domNodes: [content] };
+                    }
+
+
+                });
+                calendarInstance.render();
+            }
+        });
+    </script>
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+    <!-- Bootstrap 5 JavaScript (including Popper.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:3000"  # Map container's port 3000 to host's port 8080
+    env_file:
+      - .env  # Use your .env file
+    depends_on:
+      - db
+
+  db:
+    image: postgres:17-alpine  # Replace with your DB's image
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+volumes:
+  db_data:
+

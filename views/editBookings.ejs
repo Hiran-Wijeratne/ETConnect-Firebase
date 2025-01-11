@@ -1,0 +1,167 @@
+<%- include("partials/header.ejs") %>
+</div>
+ <!-- header section end -->
+  <!-- banner section start -->
+  <div class="banner_section layout_padding">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-12">
+          <div id="scrollButton" class="read_bt"><a style="color: white;">Edit Your Booking</a></div>
+          <div class="scroll-marker"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- banner section end -->
+  </div>
+ <!-- header section end -->
+  <!-- appointment section start -->
+  <!-- First Form Section -->
+  <div class="appointment_section" id="firstForm">
+    <div class="container">
+      <div class="appointment_box">
+        <div class="row">
+          <div class="col-md-12">
+            <h1 class="appointment_taital">Edit <span style="color: #0cb7d6;">Bookings No <%=booking.booking_id %></span></h1>
+          </div>
+        </div>
+        <div class="appointment_section_2">
+          <form action="/edit" method="post" id="appointmentForm">
+            <div class="row">
+              <div class="col-md-6">
+                <input type="hidden" name="bookingId" value="<%= booking.booking_id %>">
+                <div class="form-group">
+                    <p class="doctorname_text">Number of Attendees</p>
+                    <select class="wide" name="attendees" required>
+                        <option value="">Maximum Attendees</option>
+                        <% [2, 4, 6, 8, 10, 12].forEach(count => { %>
+                            <option value="<%= count %>" <%= booking.attendees == count ? 'selected' : '' %>><%= count %></option>
+                        <% }); %>
+                    <option value="02">02</option>
+                    <option value="04">04</option>
+                    <option value="06">06</option>
+                    <option value="08">08</option>
+                    <option value="10">10</option>
+                    <option value="12">12</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <p class="doctorname_text_date">Choose Date</p>
+                <input id="datepicker" value="<%= booking.date %>" required autocomplete="off"/>
+                <input type="hidden" name="date" id="hiddenDate" value="<%= booking.date %>" hidden required>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <p class="doctorname_text">Purpose of the Meeting</p>
+                <input type="text" class="email_text" placeholder="Meeting Details" name="purpose"  value="<%= booking.description %>" required>
+              </div>
+              <div class="col-md-6">
+                <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                <input class="read_bt_next_button" id="nextButton" type="button" value="next">
+              </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Second Form Section (Initially Hidden) -->
+  <div class="appointment_section" id="secondForm" style="display: none;">
+    <div class="container">
+      <div class="appointment_box">
+        <div class="row">
+          <div class="col-md-12">
+            <div class="form-group">
+              <h1 class="appointment_taital">Schedule <span style="color: #0cb7d6;">Your Meeting</span></h1>
+            </div>
+          </div>
+          <div class="appointment_section_2">
+            <div class="container">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <p class="doctorname_text">Start Time</p>
+                    <select class="wide" name="start" required>
+                      <option value="">Select Your End Time</option>
+                      <!-- <select class="wide" name="start" required> -->
+                        <% ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30','13:00',
+                        '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'].forEach(time => { %>
+                            <option value="<%= time %>" <%= booking.start_time === time ? 'selected' : '' %>><%= time %></option>
+                        <% }); %>
+                    </select>
+                      <!-- <option>Select Your Start Time</option>
+                      <option value="08:00:00">08:00:00 </option>
+                      <option value="09:00:00">09:00:00 </option>
+                      <option value="10:00:00">10:00:00 </option>
+                      <option value="11:00:00">11:00:00 </option>
+                      <option value="12:00:00">12:00:00</option>
+                      <option value="13:00:00">13:00:00 </option>
+                      <option value="14:00:00">14:00:00 </option>
+                      <option value="15:00:00">15:00:00 </option>
+                      <option value="16:00:00">16:00:00 </option>
+                      <option value="17:00:00">17:00:00 </option>
+                    </select> -->
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <p class="doctorname_text">End Time</p>
+                    <select class="wide" name="end" required>
+                      <option value="">Select Your End Time</option>
+                      <% ['08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30','13:00',
+                      '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'].forEach(time => { %>
+                      <option value="<%= time %>" <%= booking.end_time === time ? 'selected' : '' %>><%= time %></option>
+                      <% }); %>
+                      <!-- <option>Select Your End Time</option>
+                      <option value="09:00:00">09:00:00 </option>
+                      <option value="10:00:00">10:00:00 </option>
+                      <option value="11:00:00">11:00:00 </option>
+                      <option value="12:00:00">12:00:00</option>
+                      <option value="13:00:00">13:00:00 </option>
+                      <option value="14:00:00">14:00:00 </option>
+                      <option value="15:00:00">15:00:00 </option>
+                      <option value="16:00:00">16:00:00 </option>
+                      <option value="17:00:00">17:00:00 </option>
+                      <option value="18:00:00">18:00:00 </option> -->
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-8">
+                  <h1 class="doctorname_text_chosen_date">Your selected meeting date is ...</h1>
+                </div>
+                <div class="col-md-12" id="bookingsList">
+                </div>
+                <div class="row">
+                  <div class="col-md-8">
+                    <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                    <p class="doctorname_text">Your Current Booking (before updating):</p>
+                      <p class="doctorname_text">Booking ID: <%=booking.booking_id %> | 📅 <%=booking.date %> | 🕒 <%=booking.start_time %> - <%=booking.end_time %></p>
+                  </div>
+                  <div class="col-md-2">
+                    <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                    <input class="read_bt_submit_button" id="backButton" type="button" value="Back">
+                  </div>
+                  <div class="col-md-2">
+                    <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
+                    <input class="read_bt_submit_button" type="submit" value="Update">
+                  </div>
+                </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- appointment section end -->
+  <script>
+    // Serialize the upcoming bookings as JSON
+    const updatingBooking = <%- JSON.stringify(booking) %>;
+</script>
+<%- include("partials/footer.ejs") %>

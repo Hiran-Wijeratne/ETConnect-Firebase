@@ -1,0 +1,436 @@
+[33mcommit a70160427ffdc9ae94e47096c5fbe2d0fbeec44a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Hiran Wijeratne <no.identity.needed.2022@gmail.com>
+Date:   Fri Nov 15 03:23:26 2024 +0800
+
+    form functionality implemented halfway
+
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mnew file mode 100644[m
+[1mindex 0000000..4c49bd7[m
+[1m--- /dev/null[m
+[1m+++ b/.gitignore[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32m.env[m
+[1mdiff --git a/index.js b/index.js[m
+[1mindex 6492de6..724c18f 100644[m
+[1m--- a/index.js[m
+[1m+++ b/index.js[m
+[36m@@ -9,9 +9,17 @@[m [mimport env from "dotenv";[m
+ import axios from "axios";[m
+ [m
+ [m
+[31m-[m
+ const app = express();[m
+ const port = 3000;[m
+[32m+[m[32menv.config();[m
+[32m+[m
+[32m+[m[32mconst pool = new pg.Pool({[m
+[32m+[m[32m  user: process.env.DB_USER,[m
+[32m+[m[32m  host: process.env.DB_HOST,[m
+[32m+[m[32m  database: process.env.DB_NAME,[m
+[32m+[m[32m  password: process.env.DB_PASSWORD,[m
+[32m+[m[32m  port: process.env.DB_PORT,[m
+[32m+[m[32m});[m
+ [m
+ app.use(express.static("public"));[m
+ app.use(bodyParser.urlencoded({ extended: true }));[m
+[36m@@ -28,68 +36,108 @@[m [mapp.get("/mybookings", (req, res) => {[m
+   res.render("mybookings.ejs");[m
+ });[m
+ [m
+[31m-app.post("/next", (req, res)=>{[m
+[31m-     console.log(req.body);[m
+[32m+[m[32mapp.post('/next', async (req, res) => {[m
+[32m+[m[32m  const { date } = req.body;  // selectedDate from frontend[m
+[32m+[m
+[32m+[m[32m  // Reformat date to YYYY-MM-DD format[m
+[32m+[m[32m  const [day, month, year] = date.split('-');[m
+[32m+[m[32m  const formattedDate = `${year}-${month}-${day}`;[m
+[32m+[m
+[32m+[m[32m  try {[m
+[32m+[m[32m      // Step 1: Query the bookings table to get booking_ids and their respective end_times for the selected date[m
+[32m+[m[32m      const bookingsResult = await pool.query([m
+[32m+[m[32m          `SELECT booking_id, end_time FROM bookings WHERE date = $1`,[m
+[32m+[m[32m          [formattedDate][m
+[32m+[m[32m      );[m
+[32m+[m
+[32m+[m[32m      // If no bookings found, send an empty response[m
+[32m+[m[32m      if (bookingsResult.rows.length === 0) {[m
+[32m+[m[32m          return res.json({ timeslots: [], end_times: [] });[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Step 2: Extract booking_ids from the result[m
+[32m+[m[32m      const bookingIds = bookingsResult.rows.map(row => row.booking_id);[m
+[32m+[m
+[32m+[m[32m      // Step 3: Query the timeslots table for all timeslots related to those booking_ids[m
+[32m+[m[32m      const timeslotsResult = await pool.query([m
+[32m+[m[32m          `SELECT timeslot, booking_id FROM timeslots WHERE booking_id = ANY($1)`,[m
+[32m+[m[32m          [bookingIds][m
+[32m+[m[32m      );[m
+[32m+[m
+[32m+[m[32m      // Step 4: Extract timeslots and end_times[m
+[32m+[m[32m      const timeslots = timeslotsResult.rows.map(row => row.timeslot);[m
+[32m+[m[32m      const endTimes = bookingsResult.rows.map(row => row.end_time);  // Get end_times from the bookings table[m
+[32m+[m
+[32m+[m[32m      // Step 5: Send the timeslot and end_time data to the frontend[m
+[32m+[m[32m      res.json({ timeslots, end_times: endTimes });[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m      console.error('Error fetching timeslots and end_times:', error);[m
+[32m+[m[32m      res.status(500).send('Error fetching timeslots and end_times');[m
+[32m+[m[32m  }[m
+ });[m
+ [m
+[32m+[m
+[32m+[m
+[32m+[m[32m// Convert 12-hour time to 24-hour format[m
+ function convertTo24HourFormat(time12h) {[m
+[31m-  const [time, modifier] = time12h.split(' ');  // Split time and AM/PM[m
+[31m-  let [hours, minutes] = time.split(':');     // Split hours and minutes[m
+[32m+[m[32m  const [time, modifier] = time12h.split(' ');[m
+[32m+[m[32m  let [hours, minutes] = time.split(':');[m
+ [m
+[31m-  // Convert hours to 24-hour format[m
+[31m-  if (modifier === 'pm' && hours !== '12') {[m
+[32m+[m[32m  if (modifier.toLowerCase() === 'pm' && hours !== '12') {[m
+     hours = (parseInt(hours) + 12).toString();[m
+   }[m
+[31m-  if (modifier === 'am' && hours === '12') {[m
+[31m-    hours = '00';  // Midnight case[m
+[32m+[m[32m  if (modifier.toLowerCase() === 'am' && hours === '12') {[m
+[32m+[m[32m    hours = '00';[m
+   }[m
+ [m
+   return `${hours}:${minutes}`;[m
+ }[m
+ [m
+[31m-app.post('/submit', (req, res) => {[m
+[32m+[m[32m// Submit route to process and store booking data[m
+[32m+[m[32mapp.post('/submit', async (req, res) => {[m
+   const { attendees, date, start, end, purpose } = req.body;[m
+ [m
+[31m-  // Step 1: Reformat the date from 'DD-MM-YYYY' to 'YYYY-MM-DD'[m
+[32m+[m[32m  // Reformat date and convert times to 24-hour format[m
+   const [day, month, year] = date.split('-');[m
+[31m-  const formattedDate = `${year}-${month}-${day}`;  // Convert to 'YYYY-MM-DD'[m
+[31m-[m
+[31m-  // Step 2: Convert start and end times from 12-hour to 24-hour format[m
+[31m-  const startTime24 = convertTo24HourFormat(start);  // e.g., "02 pm" -> "14:00"[m
+[31m-  const endTime24 = convertTo24HourFormat(end);      // e.g., "06 pm" -> "18:00"[m
+[31m-[m
+[31m-  // Step 3: Convert start and end times to Date objects[m
+[31m-  const startDate = new Date(`1970-01-01T${startTime24}:00Z`);[m
+[31m-  const endDate = new Date(`1970-01-01T${endTime24}:00Z`);[m
+[31m-[m
+[31m-  // Step 4: Create an empty array for timeslots[m
+[31m-  const timeslots = [];[m
+[31m-[m
+[31m-  // Step 5: Populate the timeslots array with one-hour intervals[m
+[31m-  let currentSlot = new Date(startDate);[m
+[31m-[m
+[31m-  while (currentSlot < endDate) {[m
+[31m-    // Format the time slot into a string (e.g., "08:00", "09:00", etc.)[m
+[31m-    const slotTime = currentSlot.toISOString().substring(11, 16);  // Extracts "HH:MM"[m
+[31m-    timeslots.push(slotTime);[m
+[31m-[m
+[31m-    // Increment the current time by one hour[m
+[31m-    currentSlot.setHours(currentSlot.getHours() + 1);[m
+[32m+[m[32m  const formattedDate = `${year}-${month}-${day}`;[m
+[32m+[m[32m  const startTime24 = convertTo24HourFormat(start);[m
+[32m+[m[32m  const endTime24 = convertTo24HourFormat(end);[m
+[32m+[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    // Step 1: Insert booking details into the bookings table[m
+[32m+[m[32m    const bookingResult = await pool.query([m
+[32m+[m[32m      `INSERT INTO bookings (user_id, date, start_time, end_time, description, attendees, created_at)[m
+[32m+[m[32m       VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING booking_id`,[m
+[32m+[m[32m      [1, formattedDate, startTime24, endTime24, purpose, attendees] // Assume user_id = 1 for this example[m
+[32m+[m[32m    );[m
+[32m+[m[32m    const bookingId = bookingResult.rows[0].booking_id;[m
+[32m+[m
+[32m+[m[32m    // Step 2: Generate timeslots and insert them into the timeslots table[m
+[32m+[m[32m    const timeslots = [];[m
+[32m+[m[32m    let currentSlot = new Date(`1970-01-01T${startTime24}:00Z`);[m
+[32m+[m[32m    const endSlot = new Date(`1970-01-01T${endTime24}:00Z`);[m
+[32m+[m
+[32m+[m[32m    while (currentSlot < endSlot) {[m
+[32m+[m[32m      const slotTime = currentSlot.toISOString().substring(11, 16); // "HH:MM" format[m
+[32m+[m[32m      timeslots.push(slotTime);[m
+[32m+[m
+[32m+[m[32m      // Insert each timeslot into the timeslots table[m
+[32m+[m[32m      await pool.query([m
+[32m+[m[32m        `INSERT INTO timeslots (booking_id, timeslot)[m
+[32m+[m[32m         VALUES ($1, $2)`,[m
+[32m+[m[32m        [bookingId, slotTime][m
+[32m+[m[32m      );[m
+[32m+[m
+[32m+[m[32m      currentSlot.setHours(currentSlot.getHours() + 1); // Move to the next hour[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    res.send({ message: 'Form submitted successfully', timeslots, formattedDate });[m
+[32m+[m[32m  } catch (error) {[m
+[32m+[m[32m    console.error('Error saving booking:', error);[m
+[32m+[m[32m    res.status(500).send('Error saving booking');[m
+   }[m
+[31m-[m
+[31m-  // Log the data (optional)[m
+[31m-  console.log('Attendees:', attendees);[m
+[31m-  console.log('Formatted Date:', formattedDate);  // Date in 'YYYY-MM-DD' format[m
+[31m-  console.log('Start:', start);[m
+[31m-  console.log('End:', end);[m
+[31m-  console.log('Purpose:', purpose);[m
+[31m-  console.log('Generated Time Slots:', timeslots);[m
+[31m-[m
+[31m-  // Now you can save `formattedDate` and `timeslots` to the database, etc.[m
+[31m-  res.send({ message: 'Form submitted successfully', timeslots, formattedDate });[m
+ });[m
+ [m
+[31m-[m
+ app.listen(port, () => {[m
+   console.log(`Listening on port ${port}`);[m
+ });[m
+\ No newline at end of file[m
+[1mdiff --git a/public/css/style.css b/public/css/style.css[m
+[1mindex 32bf630..031c8d4 100644[m
+[1m--- a/public/css/style.css[m
+[1m+++ b/public/css/style.css[m
+[36m@@ -130,6 +130,35 @@[m
+     text-align: left !important;[m
+ [m
+ }[m
+[32m+[m
+[32m+[m[32m/* Style for disabled dropdown options */[m
+[32m+[m[32m.disabled-option {[m
+[32m+[m[32m    color: #eae7e7; /* Light gray color */[m
+[32m+[m[32m    text-decoration: line-through; /* Optional: Strikethrough for extra visibility */[m
+[32m+[m[32m    /* font-style: italic; /* Optional: Italicized to differentiate */[m
+[32m+[m[32m} */[m
+[32m+[m
+[32m+[m[32minput:disabled {[m
+[32m+[m[32m    cursor: not-allowed !important;[m
+[32m+[m[32m    background-color: rgba(200, 200, 200, 0.5) !important; /* Light gray background */[m
+[32m+[m[32m    color: #999999 !important;  /* Light gray text */[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32minput[type="submit"]:disabled {[m
+[32m+[m[32m    background-color: #cccccc !important;[m
+[32m+[m[32m    color: #666666 !important;[m
+[32m+[m[32m    cursor: not-allowed !important;[m
+[32m+[m[32m    opacity: 0.6 !important;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32minput[type="submit"].read_bt_submit_button:disabled:hover {[m
+[32m+[m[32m    title: "Please ensure that all fields are filled correctly.";[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m.red-text {[m
+[32m+[m[32m    color: red;[m
+[32m+[m[32m}[m
+[32m+[m
+ /* custom css end */[m
+ [m
+ [m
+[1mdiff --git a/public/js/custom.js b/public/js/custom.js[m
+[1mindex cfb5292..d91f710 100644[m
+[1m--- a/public/js/custom.js[m
+[1m+++ b/public/js/custom.js[m
+[36m@@ -393,46 +393,119 @@[m [m$(function () {[m
+ [m
+ });[m
+ [m
+[32m+[m[32m// custom css[m[41m [m
+ [m
+[31m-// custom javascript[m
+ [m
+[31m-// JavaScript to show the second form when 'Next' is clicked[m
+ [m
+[31m-  $(document).ready(function() {[m
+[32m+[m
+[32m+[m[32m$(document).ready(function() {[m
+     // Event listener for the "Next" button[m
+     $('#nextButton').on('click', function() {[m
+         // Get the selected date from the datepicker[m
+         var selectedDate = $('#datepicker').val();[m
+[31m-        [m
+[32m+[m
+         // Set the hidden input with the selected date[m
+         $('#hiddenDate').val(selectedDate);[m
+[31m-        [m
+[32m+[m
+         // Display the chosen date in the second form section[m
+[31m-        $('.doctorname_text_chosen_date').text('Your selected meeting date is ' + selectedDate);[m
+[32m+[m[32m        if (selectedDate) {[m
+[32m+[m			[32m$('.doctorname_text_chosen_date').text('Your selected meeting date is ' + selectedDate).removeClass('red-text');[m
+[32m+[m		[32m} else {[m
+[32m+[m			[32m$('.doctorname_text_chosen_date').text('You have not selected a date').addClass('red-text');[m
+[32m+[m		[32m}[m
+ [m
+         console.log('Selected Date:', selectedDate); // For debugging[m
+         console.log('Form Data:', $('form').serialize()); // Log all form data[m
+ [m
+[31m-		$.ajax({[m
+[31m-            url: '/next', // Update this URL to match your backend endpoint[m
+[31m-            type: 'POST',[m
+[31m-            data: {[m
+[31m-                date: selectedDate[m
+[31m-            },[m
+[31m-            success: function(response) {[m
+[31m-                console.log('Date sent successfully:', response);[m
+[31m-            },[m
+[31m-            error: function(error) {[m
+[31m-                console.error('Error sending date:', error);[m
+[32m+[m[32m        // Function to convert 24-hour format time to 12-hour AM/PM format[m
+[32m+[m[32m        function convertToAmPmFormat(time24) {[m
+[32m+[m[32m            const [hours, minutes] = time24.split(':');[m
+[32m+[m[32m            let ampm = 'am';[m
+[32m+[m[32m            let hours12 = parseInt(hours, 10);[m
+[32m+[m
+[32m+[m[32m            if (hours12 >= 12) {[m
+[32m+[m[32m                ampm = 'pm';[m
+[32m+[m[32m                if (hours12 > 12) {[m
+[32m+[m[32m                    hours12 -= 12; // Convert hours to 12-hour format[m
+[32m+[m[32m                }[m
+[32m+[m[32m            } else if (hours12 === 0) {[m
+[32m+[m[32m                hours12 = 12; // Midnight case[m
+             }[m
+[31m-        });[m
+ [m
+[32m+[m[32m            return `${hours12.toString().padStart(2, '0')}:${minutes} ${ampm}`;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        // AJAX call to get the available timeslots for the selected date[m
+[32m+[m		[32m$.ajax({[m
+[32m+[m			[32murl: '/next', // Ensure this URL matches your backend endpoint[m
+[32m+[m			[32mtype: 'POST',[m
+[32m+[m			[32mdata: {[m
+[32m+[m				[32mdate: selectedDate[m
+[32m+[m			[32m},[m
+[32m+[m			[32msuccess: function(response) {[m
+[32m+[m				[32mconsole.log('Date sent successfully:', response);[m
+[32m+[m[41m				[m
+[32m+[m				[32m// Access the timeslots and end_times arrays from the response[m
+[32m+[m				[32mconst timeslots = response.timeslots;[m
+[32m+[m				[32mconst endTimes = response.end_times;[m
+[32m+[m[41m		[m
+[32m+[m				[32mconsole.log('Timeslots for selected date:', timeslots);[m
+[32m+[m				[32mconsole.log('End times for selected date:', endTimes);[m
+[32m+[m[41m		[m
+[32m+[m				[32m//Disable corresponding options in the "end" select dropdown based on end_time[m
+[32m+[m				[32mendTimes.forEach(endTime => {[m
+[32m+[m					[32m// Convert the 24-hour end time to 12-hour AM/PM format[m
+[32m+[m					[32mconst endTimeValue = convertToAmPmFormat(endTime);[m
+[32m+[m					[32mconsole.log('Converted end time:', endTimeValue);[m
+[32m+[m[41m		[m
+[32m+[m					[32m// Disable the corresponding option in the "end" select dropdown[m
+[32m+[m					[32m$('select[name="end"] option').each(function() {[m
+[32m+[m						[32mif ($(this).text() === endTimeValue) {[m
+[32m+[m							[32m$(this).prop('disabled', true).addClass('disabled-option');;  // Disable the matching option[m
+[32m+[m						[32m}[m
+[32m+[m					[32m});[m
+[32m+[m				[32m});[m
+[32m+[m[41m		[m
+[32m+[m				[32m // Disable corresponding options in the "start" and "end" select dropdowns based on timeslots[m
+[32m+[m				[32m timeslots.forEach(slot => {[m
+[32m+[m					[32mconst timeslotValue = convertToAmPmFormat(slot);[m
+[32m+[m					[32mconsole.log('Converted timeslot:', timeslotValue);[m
+[32m+[m[41m			[m
+[32m+[m					[32m// Disable the corresponding option in the "start" select dropdown[m
+[32m+[m					[32m$('select[name="start"] option').each(function() {[m
+[32m+[m						[32mif ($(this).text() === timeslotValue) {[m
+[32m+[m							[32m$(this).prop('disabled', true).addClass('disabled-option');;[m
+[32m+[m						[32m}[m
+[32m+[m					[32m});[m
+[32m+[m[41m			[m
+[32m+[m					[32m// Disable the corresponding option in the "end" select dropdown[m
+[32m+[m					[32m$('select[name="end"] option').each(function() {[m
+[32m+[m						[32mif ($(this).text() === timeslotValue) {[m
+[32m+[m							[32m$(this).prop('disabled', true).addClass('disabled-option');;[m
+[32m+[m						[32m}[m
+[32m+[m					[32m});[m
+[32m+[m				[32m});[m
+[32m+[m
+[32m+[m				[32m// Optional: Display the available timeslots for debugging[m
+[32m+[m				[32mconst timeslotList = $('#timeslotList');[m
+[32m+[m				[32mtimeslotList.empty(); // Clear previous timeslots[m
+[32m+[m				[32mtimeslots.forEach(slot => {[m
+[32m+[m					[32mconst formattedTime = convertToAmPmFormat(slot.timeslot);[m
+[32m+[m					[32mtimeslotList.append(`<li>${formattedTime}</li>`);[m
+[32m+[m				[32m});[m
+[32m+[m			[32m},[m
+[32m+[m			[32merror: function(error) {[m
+[32m+[m				[32mconsole.error('Error sending date:', error);[m
+[32m+[m			[32m}[m
+[32m+[m		[32m});[m
+[32m+[m[41m		[m
+         // Hide the first form section and show the second form section[m
+         $('#firstForm').hide();[m
+         $('#secondForm').show();[m
+     });[m
+ [m
+[31m-	$('#appointmentForm').on('submit', function(event) {[m
+[32m+[m[32m    // Event listener for the form submission[m
+[32m+[m[32m    $('#appointmentForm').on('submit', function(event) {[m
+         event.preventDefault(); // Prevent default form submission[m
+ [m
+         // Get form data[m
+[36m@@ -465,7 +538,93 @@[m [m$(function () {[m
+         // Hide the second form section and show the first form section[m
+         $('#secondForm').hide();[m
+         $('#firstForm').show();[m
+[32m+[m		[32m$('select[name="start"] option, select[name="end"] option').prop('disabled', false).removeClass('disabled-option');[m
+[32m+[m		[32m$('#end-time-error').remove();[m[41m [m
+     });[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32m    const $startTime = $('select[name="start"]');[m
+[32m+[m[32m    const $endTime = $('select[name="end"]');[m
+[32m+[m[32m    const $submitButton = $('input[type="submit"]');[m
+[32m+[m[32m    const $nextButton = $('#nextButton');[m
+[32m+[m[32m    const $backButton = $('#backButton');[m
+[32m+[m[32m    const $firstForm = $('#firstForm');[m
+[32m+[m[32m    const $secondForm = $('#secondForm');[m
+[32m+[m
+[32m+[m[32m    // Disable the submit button initially[m
+[32m+[m[32m    $submitButton.prop('disabled', true);[m
+[32m+[m
+[32m+[m[32m    // Function to convert time format to comparable 24-hour format[m
+[32m+[m[32m    function convertTo24Hour(time) {[m
+[32m+[m[32m        const [timeStr, modifier] = time.split(' ');[m
+[32m+[m[32m        let [hours, minutes] = timeStr.split(':');[m
+[32m+[m[32m        if (modifier === 'pm' && hours !== '12') hours = parseInt(hours) + 12;[m
+[32m+[m[32m        if (modifier === 'am' && hours === '12') hours = '00';[m
+[32m+[m[32m        return `${hours}:${minutes}`;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Function to validate the start and end times[m
+[32m+[m[32m    function validateTimes() {[m
+[32m+[m[32m        const startTime = $startTime.val();[m
+[32m+[m[32m        const endTime = $endTime.val();[m
+[32m+[m
+[32m+[m[32m        // Remove any existing warning message[m
+[32m+[m[32m        $('#end-time-error').remove();[m
+[32m+[m
+[32m+[m[32m        if (startTime && endTime) {[m
+[32m+[m[32m            const start24 = convertTo24Hour(startTime.toLowerCase());[m
+[32m+[m[32m            const end24 = convertTo24Hour(endTime.toLowerCase());[m
+[32m+[m
+[32m+[m[32m            // Check if the end time is not later than the start time[m
+[32m+[m[32m            if (end24 <= start24) {[m
+[32m+[m[32m                // Add warning message[m
+[32m+[m[32m                const error = $('<p id="end-time-error" style="color: red;">End time must be later than start time.</p>');[m
+[32m+[m[32m                $endTime.parent().append(error);[m
+[32m+[m
+[32m+[m[32m                // Disable submit button[m
+[32m+[m[32m                $submitButton.prop('disabled', true);[m
+[32m+[m[32m            } else {[m
+[32m+[m[32m                // Enable submit button[m
+[32m+[m[32m                $submitButton.prop('disabled', false);[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Validate times whenever the start or end time is changed[m
+[32m+[m[32m    $startTime.on('change', validateTimes);[m
+[32m+[m[32m    $endTime.on('change', validateTimes);[m
+[32m+[m
+[3
