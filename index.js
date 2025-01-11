@@ -20,6 +20,7 @@ import {
   getDocs,
   setDoc,
   doc,
+  orderBy,
   updateDoc,
   deleteDoc,
   serverTimestamp,
@@ -191,57 +192,65 @@ app.use(async (req, res, next) => {
     const thirtyDaysLater = new Date(today);
     thirtyDaysLater.setDate(today.getDate() + 30);
 
-    // Query to get all bookings in the next 30 days
-    const bookingsResult = await pool.query(
-      `SELECT booking_id, date
-       FROM bookings
-       WHERE date >= $1 AND date <= $2`,
-      [today, thirtyDaysLater]
+    // Query Firestore to get all bookings in the next 30 days
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
+      where('date', '>=', today.toISOString().split('T')[0]),
+      where('date', '<=', thirtyDaysLater.toISOString().split('T')[0])
     );
 
-    const upcomingBookings = bookingsResult.rows;
+    const bookingsSnapshot = await getDocs(bookingsQuery);
+    const bookings = bookingsSnapshot.docs.map(doc => doc.data());
 
-    // Initialize an object to track time slots for each day
-    const timeSlotsCount = {};
+    // Initialize an object to track booked time slots
+    const timeSlotsByDate = {};
 
-    // Loop through the bookings and get the time slots for each booking
-    for (const booking of upcomingBookings) {
-      const bookingId = booking.booking_id;
-      const bookingDate = booking.date;
+    // Process each booking
+    for (const booking of bookings) {
+      const { date, starttime, endtime } = booking;
 
-      // Query to get time slots for this booking
-      const timeSlotsResult = await pool.query(
-        `SELECT timeslot FROM timeslots
-         WHERE booking_id = $1`,
-        [bookingId]
-      );
+      // Parse the start and end times
+      const bookingStart = new Date(`${date}T${starttime}`);
+      const bookingEnd = new Date(`${date}T${endtime}`);
 
-      // Count time slots for this booking and day
-      const timeSlotsForThisBooking = timeSlotsResult.rows.length;
-      const formattedDate = formatDate(new Date(bookingDate));
-
-      if (!timeSlotsCount[formattedDate]) {
-        timeSlotsCount[formattedDate] = 0;
+      // Divide the day into 30-minute intervals (from 8 AM to 6 PM)
+      const timeSlots = [];
+      for (
+        let slot = new Date(`${date}T08:00`);
+        slot < new Date(`${date}T18:00`);
+        slot.setMinutes(slot.getMinutes() + 30)
+      ) {
+        timeSlots.push(new Date(slot).toISOString());
       }
 
-      timeSlotsCount[formattedDate] += timeSlotsForThisBooking;
+      // Mark booked time slots
+      for (let slot of timeSlots) {
+        const slotTime = new Date(slot);
+        if (slotTime >= bookingStart && slotTime < bookingEnd) {
+          if (!timeSlotsByDate[date]) {
+            timeSlotsByDate[date] = new Set();
+          }
+          timeSlotsByDate[date].add(slot);
+        }
+      }
     }
 
-    // Filter days with more than 10 time slots
-    const datesWithTooManyTimeSlots = [];
-    for (const date in timeSlotsCount) {
-      if (timeSlotsCount[date] >= 20) {
-        datesWithTooManyTimeSlots.push(date);
+    // Identify fully booked days (20 slots = 8 AM - 6 PM)
+    const fullyBookedDays = [];
+    for (const date in timeSlotsByDate) {
+      const bookedSlots = timeSlotsByDate[date];
+      if (bookedSlots.size === 20) {
+        fullyBookedDays.push(formatDate(new Date(date)));
       }
     }
 
     // Make data available to all templates
-    res.locals.datesWithTooManyTimeSlots = datesWithTooManyTimeSlots;
+    res.locals.datesWithTooManyTimeSlots = fullyBookedDays;
     res.locals.user = req.isAuthenticated() ? req.user : null;
 
     next();
   } catch (err) {
-    console.error('Error fetching data:', err);
+    console.error('Error fetching data from Firestore:', err);
     next(err); // Pass the error to the next middleware
   }
 });
@@ -398,177 +407,81 @@ passport.use("google", new GoogleStrategy({
   }
 }));
 
-// app.get("/bookinglist", async (req, res) => {
-//   const currentDate = moment().format("YYYY-MM-DD");
-//   const currentTime = moment().format("HH:mm:ss");
-//   const pastLimitDate = moment().subtract(30, "days").format("YYYY-MM-DD"); // Date 30 days ago
+app.get("/bookinglist", async (req, res) => {
+  try {
+    const currentDate = moment(); // Get the current date and time
+    const currentDateString = currentDate.format("YYYY-MM-DD");
+    const currentTime = currentDate.format("HH:mm:ss");
+    const pastLimitDate = moment().subtract(30, "days").format("YYYY-MM-DD");
 
-//   const upcomingQuery = `
-//     SELECT 
-//       b.booking_id, 
-//       u.username, 
-//       b.date, 
-//       b.start_time, 
-//       b.end_time, 
-//       b.description, 
-//       b.attendees, 
-//       DATE(b.created_at) AS booking_date
-//     FROM bookings b
-//     JOIN users u ON b.user_id = u.user_id
-//     WHERE 
-//       (b.date > $1) OR 
-//       (b.date = $1 AND b.end_time > $2)
-//     ORDER BY b.date, b.start_time
-//   `;
+    // Query for upcoming bookings (today or after today), ordered by date and starttime
+    const upcomingQuery = query(
+      collection(db, "bookings"),
+      where("date", ">=", currentDateString),  // Fetch bookings for today and beyond
+      orderBy("date", "asc"),
+      orderBy("starttime", "asc")
+    );
 
-//   const pastQuery = `
-//     SELECT 
-//       b.booking_id, 
-//       u.username, 
-//       b.date, 
-//       b.start_time, 
-//       b.end_time, 
-//       b.description, 
-//       b.attendees, 
-//       DATE(b.created_at) AS booking_date
-//     FROM bookings b
-//     JOIN users u ON b.user_id = u.user_id
-//     WHERE 
-//       (
-//         (b.date < $1 AND b.date >= $3) OR 
-//         (b.date = $1 AND b.end_time <= $2)
-//       )
-//     ORDER BY b.date DESC, b.start_time DESC
-//   `;
+    // Query for past bookings (before today), ordered by date and starttime
+    const pastQuery = query(
+      collection(db, "bookings"),
+      where("date", "<", currentDateString),
+      where("date", ">=", pastLimitDate),
+      orderBy("date", "asc"),
+      orderBy("starttime", "asc")
+    );
 
-//   try {
-//     const upcomingResult = await pool.query(upcomingQuery, [currentDate, currentTime]);
-//     const pastResult = await pool.query(pastQuery, [currentDate, currentTime, pastLimitDate]);
+    const upcomingSnapshot = await getDocs(upcomingQuery);
+    const pastSnapshot = await getDocs(pastQuery);
 
-//     const formatBookings = (rows) =>
-//       rows.map(row => ({
-//         booking_id: row.booking_id,
-//         username: row.username,
-//         date: moment(row.date).format("DD-MM-YYYY"),
-//         start_time: row.start_time,
-//         end_time: row.end_time,
-//         description: row.description,
-//         attendees: row.attendees,
-//         booking_date: moment(row.booking_date).format("DD-MM-YYYY"),
-//       }));
+    // Function to format bookings
+    const formatBookings = (snapshot) => {
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        const bookingDate = moment(data.date);
+        const endTime = moment(data.endtime, "HH:mm:ss");
 
-//     const upcomingBookings = formatBookings(upcomingResult.rows);
-//     const pastBookings = formatBookings(pastResult.rows);
+        let status = "upcoming"; // Default status
 
-//     res.render("bookinglist.ejs", { upcomingBookings, pastBookings });
-//   } catch (err) {
-//     console.error("Error retrieving bookings:", err);
-//     res.status(500).send("Error retrieving bookings.");
-//   }
-// });
+        // Check if the booking is in the past (based on end time)
+        if (bookingDate.isBefore(currentDate, "day") || 
+            (bookingDate.isSame(currentDate, "day") && endTime.isBefore(currentDate, "minute"))) {
+          status = "past"; // Set status as 'past' if date is before today or time has passed for today
+        }
 
-// app.get("/mybookings", async (req, res) => {
-//   if (req.isAuthenticated()) {
-//     const currentDate = moment().format("YYYY-MM-DD");
-//     const currentTime = moment().format("HH:mm:ss");
+        return {
+          booking_id: doc.id,
+          username: data.email || 'Unknown', // Default value if 'name' is missing
+          date: bookingDate.format("DD-MM-YYYY"),
+          start_time: data.starttime || 'N/A',
+          end_time: data.endtime || 'N/A',
+          description: data.des || 'No description',
+          attendees: data.attendees || 'No attendees',
+          booking_date: moment(data.created_at).format("DD-MM-YYYY"),
+          status: status // Add status field to track whether booking is past or upcoming
+        };
+      });
+    };
 
-//     // Retrieve the user_id of the currently logged-in user
-//     const userId = req.user.user_id;
+    // Format both upcoming and past bookings
+    const upcomingBookings = formatBookings(upcomingSnapshot);
+    const pastBookings = formatBookings(pastSnapshot);
 
-//     const upcomingQuery = `
-//       SELECT 
-//         b.booking_id, 
-//         u.username, 
-//         b.date, 
-//         b.start_time, 
-//         b.end_time, 
-//         b.description, 
-//         b.attendees, 
-//         DATE(b.created_at) AS booking_date
-//       FROM bookings b
-//       JOIN users u ON b.user_id = u.user_id
-//       WHERE 
-//         b.user_id = $1 AND
-//         b.date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 DAYS'
-//       ORDER BY b.date, b.start_time
-//     `;
+    // Filter past bookings from upcoming ones based on status
+    const allBookings = [...upcomingBookings, ...pastBookings];
+    const filteredUpcomingBookings = allBookings.filter(booking => booking.status === "upcoming");
+    const filteredPastBookings = allBookings.filter(booking => booking.status === "past");
 
-//     const pastQuery = `
-//       SELECT 
-//         b.booking_id, 
-//         u.username, 
-//         b.date, 
-//         b.start_time, 
-//         b.end_time, 
-//         b.description, 
-//         b.attendees, 
-//         DATE(b.created_at) AS booking_date
-//       FROM bookings b
-//       JOIN users u ON b.user_id = u.user_id
-//       WHERE 
-//         b.user_id = $1 AND
-//         b.date BETWEEN CURRENT_DATE - INTERVAL '90 DAYS' AND CURRENT_DATE
-//       ORDER BY b.date DESC, b.start_time DESC
-//     `;
+    res.render("bookinglist.ejs", { upcomingBookings: filteredUpcomingBookings, pastBookings: filteredPastBookings });
+  } catch (err) {
+    console.error("Error retrieving bookings:", err);
+    res.status(500).send("Error retrieving bookings.");
+  }
+});
 
-//     try {
-//       const upcomingResult = await pool.query(upcomingQuery, [userId]);
-//       const pastResult = await pool.query(pastQuery, [userId]);
 
-//       const formatBookings = (rows) =>
-//         rows.map(row => ({
-//           booking_id: row.booking_id,
-//           username: row.username,
-//           date: moment(row.date).format("DD-MM-YYYY"),
-//           start_time: row.start_time,
-//           end_time: row.end_time,
-//           description: row.description,
-//           attendees: row.attendees,
-//           booking_date: moment(row.booking_date).format("DD-MM-YYYY"),
-//         }));
 
-//       const upcomingMyBookings = formatBookings(upcomingResult.rows);
-//       const pastMyBookings = formatBookings(pastResult.rows);
 
-//       res.render("mybookings.ejs", { upcomingMyBookings, pastMyBookings });
-//     } catch (err) {
-//       console.error("Error retrieving your bookings:", err);
-//       res.status(500).send("Error retrieving your bookings.");
-//     }
-//   } else {
-//     res.redirect("/login");
-//   }
-// });
-
-// app.get('/edit-booking/:id', async (req, res) => {
-//   if (req.isAuthenticated()) {
-//   const booking_id = req.params.id;
-
-//   try {
-//     // Query only the specific booking by booking_id
-//     const result = await pool.query('SELECT * FROM bookings WHERE booking_id = $1', [booking_id]);
-
-//     if (result.rows.length === 0) {
-//       return res.status(404).send('Booking not found');
-//     }
-
-//     // Use the booking data as needed
-//     const booking = result.rows[0];
-
-//     // Format the date to DD-MM-YYYY
-//     booking.date = moment(booking.date).format('DD-MM-YYYY');
-//     booking.start_time = moment(booking.start_time, 'HH:mm:ss').format('HH:mm'); // Adjust format as needed
-//     booking.end_time = moment(booking.end_time, 'HH:mm:ss').format('HH:mm'); // Adjust format as needed
-
-//     res.render('editBookings.ejs', { booking });
-//   } catch (error) {
-//     console.error('Error fetching booking:', error);
-//     res.status(500).send('Server error');
-//   }
-// } else {
-//   res.redirect("/login");
-// }
-// });
 
 app.post('/next', async (req, res) => {
   const { date } = req.body; // selectedDate from frontend
@@ -722,179 +635,78 @@ app.post('/submit', async (req, res) => {
 });
 
 
-// app.get('/calendarPage', async (req, res) => {
-//   const currentDate = moment().format("YYYY-MM-DD");
-//   const currentTime = moment().format("HH:mm:ss");
-//   const pastLimitDate = moment().subtract(30, "days").format("YYYY-MM-DD"); // Date 30 days ago
+app.get('/calendarPage', async (req, res) => {
+  try {
+    const currentDate = moment(); // Get the current date and time
+    const currentDateString = currentDate.format("YYYY-MM-DD");
+    const currentTime = currentDate.format("HH:mm:ss");
+    const pastLimitDate = moment().subtract(30, "days").format("YYYY-MM-DD"); // Date 30 days ago
 
-//   const upcomingQuery = `
-//     SELECT 
-//       b.booking_id, 
-//       u.username, 
-//       b.date, 
-//       b.start_time, 
-//       b.end_time, 
-//       b.description, 
-//       b.attendees, 
-//       DATE(b.created_at) AS booking_date
-//     FROM bookings b
-//     JOIN users u ON b.user_id = u.user_id
-//     WHERE 
-//       (b.date > $1) OR 
-//       (b.date = $1 AND b.end_time > $2)
-//     ORDER BY b.date, b.start_time
-//   `;
+    // Query for upcoming bookings (today or after today), ordered by date and starttime
+    const upcomingQuery = query(
+      collection(db, "bookings"),
+      where("date", ">=", currentDateString),  // Fetch bookings for today and beyond
+      orderBy("date", "asc"),
+      orderBy("starttime", "asc")
+    );
 
-//   const pastQuery = `
-//     SELECT 
-//       b.booking_id, 
-//       u.username, 
-//       b.date, 
-//       b.start_time, 
-//       b.end_time, 
-//       b.description, 
-//       b.attendees, 
-//       DATE(b.created_at) AS booking_date
-//     FROM bookings b
-//     JOIN users u ON b.user_id = u.user_id
-//     WHERE 
-//       (
-//         (b.date < $1 AND b.date >= $3) OR 
-//         (b.date = $1 AND b.end_time <= $2)
-//       )
-//     ORDER BY b.date DESC, b.start_time DESC
-//   `;
+    // Query for past bookings (before today), ordered by date and starttime
+    const pastQuery = query(
+      collection(db, "bookings"),
+      where("date", "<", currentDateString),
+      where("date", ">=", pastLimitDate),
+      orderBy("date", "asc"),
+      orderBy("starttime", "asc")
+    );
 
-//   try {
-//     const upcomingResult = await pool.query(upcomingQuery, [currentDate, currentTime]);
-//     const pastResult = await pool.query(pastQuery, [currentDate, currentTime, pastLimitDate]);
+    const upcomingSnapshot = await getDocs(upcomingQuery);
+    const pastSnapshot = await getDocs(pastQuery);
 
-//     const formatBookings = (rows) =>
-//       rows.map(row => ({
-//         booking_id: row.booking_id,
-//         username: row.username,
-//         date: moment(row.date).format("DD-MM-YYYY"),
-//         start_time: row.start_time,
-//         end_time: row.end_time,
-//         description: row.description,
-//         attendees: row.attendees,
-//         booking_date: moment(row.booking_date).format("DD-MM-YYYY"),
-//       }));
+    // Function to format bookings
+    const formatBookings = (snapshot) => {
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        const bookingDate = moment(data.date);
+        const endTime = moment(data.endtime, "HH:mm:ss");
 
-//     const upcomingBookings = formatBookings(upcomingResult.rows);
-//     const pastBookings = formatBookings(pastResult.rows);
+        let status = "upcoming"; // Default status
 
-//     // Render calendar.ejs and pass the bookings as JSON
-//     res.render('calendar.ejs',{ upcomingBookings, pastBookings });
-//   } catch (err) {
-//     console.error("Error retrieving bookings:", err);
-//     res.status(500).send("Error retrieving bookings.");
-//   }
-// });
+        // Check if the booking is in the past (based on end time)
+        if (bookingDate.isBefore(currentDate, "day") || 
+            (bookingDate.isSame(currentDate, "day") && endTime.isBefore(currentDate, "minute"))) {
+          status = "past"; // Set status as 'past' if date is before today or time has passed for today
+        }
 
-// app.post('/edit', async (req, res) => {
-//   if (req.isAuthenticated()) {
-//     // Extract bookingId and other fields from the form submission
-//     const { bookingId, attendees, date, start, end, purpose } = req.body;
+        return {
+          booking_id: doc.id,
+          username: data.email || 'Unknown', // Default value if 'name' is missing
+          date: bookingDate.format("DD-MM-YYYY"),
+          start_time: data.starttime || 'N/A',
+          end_time: data.endtime || 'N/A',
+          description: data.des || 'No description',
+          attendees: data.attendees || 'No attendees',
+          booking_date: moment(data.created_at).format("DD-MM-YYYY"),
+          status: status // Add status field to track whether booking is past or upcoming
+        };
+      });
+    };
 
-//     // Set default values if attendees or purpose are not provided
-//     const updatedAttendees = attendees || 2;
-//     const updatedPurpose = purpose || 'Not Stated';
+    // Format both upcoming and past bookings
+    const upcomingBookings = formatBookings(upcomingSnapshot);
+    const pastBookings = formatBookings(pastSnapshot);
 
-//     // Reformat date and convert times to 24-hour format
-//     const [day, month, year] = date.split('-');
-//     const formattedDate = `${year}-${month}-${day}`;
+    // Filter past bookings from upcoming ones based on status
+    const allBookings = [...upcomingBookings, ...pastBookings];
+    const filteredUpcomingBookings = allBookings.filter(booking => booking.status === "upcoming");
+    const filteredPastBookings = allBookings.filter(booking => booking.status === "past");
 
-//     try {
-//       // Step 1: Update the booking details in the bookings table
-//       await pool.query(
-//         `UPDATE bookings
-//          SET date = $1, start_time = $2, end_time = $3, description = $4, attendees = $5, created_at = NOW()
-//          WHERE booking_id = $6`,
-//         [formattedDate, start, end, updatedPurpose, updatedAttendees, bookingId]
-//       );
-
-//       // Step 2: Remove existing timeslots for the booking
-//       await pool.query(
-//         `DELETE FROM timeslots
-//          WHERE booking_id = $1`,
-//         [bookingId]
-//       );
-
-//       // Step 3: Generate and insert new timeslots
-//       const timeslots = [];
-//       let startTime = new Date(`1970-01-01T${start}`); // Convert to Date object
-//       let endTime = new Date(`1970-01-01T${end}`);     // Convert to Date object
-
-//       while (startTime < endTime) {
-//         const slotTime = startTime.toTimeString().substring(0, 5);
-//         timeslots.push(slotTime);
-
-//         // Insert each new timeslot into the timeslots table
-//         await pool.query(
-//           `INSERT INTO timeslots (booking_id, timeslot)
-//            VALUES ($1, $2)`,
-//           [bookingId, slotTime]
-//         );
-
-//         // Increment the start time by 1 hour
-//         startTime.setMinutes(startTime.getMinutes() + 30);
-//       }
-
-//       res.render('confirmation.ejs', {
-//         booking: {
-//           id: bookingId,
-//           date: `${day}-${month}-${year}`, // Reformat for display
-//           startTime: start,
-//           endTime: end,
-//           attendees: updatedAttendees,
-//           purpose: updatedPurpose,
-//         },
-//         timeslots,
-//       });
-//     } catch (error) {
-//       console.error('Error updating booking:', error);
-//       res.status(500).send('Error updating booking');
-//     }
-//   } else {
-//     res.redirect('/login');
-//   }
-// });
-
-// app.get('/delete/:id', async (req, res) => {
-//   if (req.isAuthenticated()) {
-//     const bookingId = req.params.id; // Extract bookingId from the form
-
-//     try {
-//       // Step 1: Delete timeslots associated with the booking
-//       await pool.query(
-//         `DELETE FROM timeslots
-//          WHERE booking_id = $1`,
-//         [bookingId]
-//       );
-
-//       // Step 2: Delete the booking itself
-//       await pool.query(
-//         `DELETE FROM bookings
-//          WHERE booking_id = $1`,
-//         [bookingId]
-//       );
-
-//       res.render('delete-confirmation.ejs', {
-//         bookingId,
-//       });
-//     } catch (error) {
-//       console.error('Error deleting booking:', error);
-//       res.status(500).send('Error deleting booking');
-//     }
-//   } else {
-//     res.redirect('/login');
-//   }
-// });
-
-// app.get('delete-confirmation', (req, res) => {
-//   res.render('delete-confirmation.ejs');
-// });
+    // Pass formatted bookings to your calendar view
+    res.render('calendar.ejs', { upcomingBookings: filteredUpcomingBookings, pastBookings: filteredPastBookings });
+  } catch (err) {
+    console.error("Error retrieving bookings:", err);
+    res.status(500).send("Error retrieving bookings.");
+  }
+});
 
 
 passport.serializeUser((user, cb) => {
