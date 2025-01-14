@@ -255,6 +255,11 @@ app.use(async (req, res, next) => {
   }
 });
 
+app.get('/api/user', (req, res) => {
+   const user = req.isAuthenticated() ? req.user : null;
+   res.json(user); // Send the user data as JSON response
+});
+
 app.get("/", async (req, res) => {
   res.render("index.ejs", { messages: req.flash('error') });
 });
@@ -267,14 +272,16 @@ app.get("/register", (req, res) => {
   res.render("register.ejs");
 });
 
-app.get("/logout", (req, res) => {
+app.get("/logout", (req, res, next) => {
   req.logout(function (err) {
     if (err) {
       return next(err);
     }
-    res.redirect("/");
+    // Redirect back to the referrer (the current page)
+    res.redirect(req.get("referer") || "/"); // Fallback to home if referer is not available
   });
 });
+
 
 app.get("/auth/google",
   passport.authenticate("google", {
@@ -334,7 +341,6 @@ app.post("/login", passport.authenticate("local", {
   failureFlash: true  // Enable flash messages on failure
 })
 );
-
 
 passport.use("local", 
   new Strategy(async function verify(username, password, cb) {

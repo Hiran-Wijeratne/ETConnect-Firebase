@@ -162,6 +162,12 @@
 
 <script>new DataTable('table.display');</script>
 
+<script>
+   const user = <%= JSON.stringify(user) %>;
+   console.log(user); // Now `user` is accessible in the frontend
+</script>
+
+
 </body>
 
 </html>

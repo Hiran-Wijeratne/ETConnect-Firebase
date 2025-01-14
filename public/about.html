@@ -102,8 +102,9 @@
                </div>
                <form class="form-inline my-2 my-lg-0">
                   <div class="search_btn">
-                     <li><a href="/login"><i class="fa fa-user" aria-hidden="true"></i><span class="signup_text">Login</span></a></li>
-                     <li><a href="/register"><i class="fa fa-user" aria-hidden="true"></i><span class="signup_text">Sign Up</span></a></li>
+                     <ul id="user-menu">
+                        <!-- User menu will be dynamically generated here -->
+                     </ul>
                   </div>
                </form>
             </div>
@@ -358,5 +359,31 @@
              uiLibrary: 'bootstrap'
          });
       </script>
+
+<script>
+   // Fetch the user data from the API endpoint
+   fetch('/api/user')
+      .then(response => response.json())  // Parse the JSON response
+      .then(user => {
+         const userMenu = document.getElementById("user-menu");
+
+         if (user) {
+            // If the user is logged in, display their email and logout option
+            userMenu.innerHTML = `
+               <li><a href="#"><i class="fa fa-user" aria-hidden="true"></i><span class="signup_text">${user.email}</span></a></li>
+               <li><a href="/logout"><i class="fa fa-sign-out" aria-hidden="true"></i><span class="signup_text">Logout</span></a></li>
+            `;
+         } else {
+            // If the user is not logged in, display login and sign-up options
+            userMenu.innerHTML = `
+               <li><a href="/login"><i class="fa fa-user" aria-hidden="true"></i><span class="signup_text">Login</span></a></li>
+               <li><a href="/register"><i class="fa fa-user" aria-hidden="true"></i><span class="signup_text">Sign Up</span></a></li>
+            `;
+         }
+      })
+      .catch(error => {
+         console.error('Error fetching user data:', error);
+      });
+</script>
    </body>
  </html>
