@@ -758,6 +758,7 @@ $(document).ready(function () {
 		// Get the selected date from the datepicker
 		var selectedDate = $datepicker.val();
 
+
 		// Set the hidden input with the selected date
 		$('#hiddenDate').val(selectedDate);
 
@@ -977,7 +978,62 @@ $(document).ready(function () {
 
 				}
 				
-				
+				// **Condition for past timeslot disabling - Apply only to today**
+const timeslotArray = [
+	"08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+	"12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+	"16:00", "16:30", "17:00", "17:30"
+];
+
+// Get current time in "HH:mm:ss" format
+const currentTime = new Date();
+const currentFormattedTime = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}:00`;
+
+console.log("Selected Date:", selectedDate);
+
+// Parse selectedDate (DD-MM-YYYY) into a valid Date object
+const [day, month, year] = selectedDate.split("-").map(Number);
+const selectedDateObject = new Date(year, month - 1, day); // Note: month is 0-indexed
+console.log("Parsed Selected Date:", selectedDateObject);
+// Check if the selected date is today
+// Check if selected date is today
+const isToday = (selectedDateObject.toDateString() === currentTime.toDateString());
+console.log("Is Today:", isToday);
+
+// Filter past timeslots if it's today
+if (isToday) {
+	const pastTimeslots = timeslotArray.filter(slot => {
+		const [hour, minute] = slot.split(":").map(Number);
+		const slotTime = new Date();
+		slotTime.setHours(hour, minute, 0, 0); // Set the time for comparison
+		return slotTime < currentTime; // Return true for past times
+	});
+
+	// Disable past timeslots while preserving existing disabled states
+	function updateDropdown(selector, timeslotCondition) {
+		$(selector).find('option').each(function () {
+			const optionValue = $(this).val(); // Value is in "HH:mm:ss" format
+			const optionTime = optionValue.slice(0, 5); // Extract "HH:mm" part
+
+			console.log(`Checking option: ${optionValue} (${optionTime})`);
+
+			// Disable if condition matches, but do not re-enable already disabled options
+			if (timeslotCondition(optionTime)) {
+				console.log(`Disabling option: ${optionValue}`);
+				$(this).prop('disabled', true).addClass('disabled-option');
+			}
+		});
+
+	}
+
+	// Condition to disable past timeslots
+	const isPastTime = (optionTime) => pastTimeslots.includes(optionTime);
+
+	// Apply to "start" and "end" dropdowns
+	updateDropdown('select[name="start"]', isPastTime);
+	updateDropdown('select[name="end"]', isPastTime);
+
+}
 
 
 				$('select').niceSelect('update');

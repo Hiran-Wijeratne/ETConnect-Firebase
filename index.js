@@ -665,9 +665,6 @@ app.post('/edit', async (req, res) => {
   }
 });
 
-
-
-
 app.post('/next', async (req, res) => {
   const { date } = req.body; // selectedDate from frontend
 
