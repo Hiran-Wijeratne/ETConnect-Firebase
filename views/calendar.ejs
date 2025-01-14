@@ -83,7 +83,7 @@
                     <p><strong>Name:</strong> <span id="modalTitle"></span></p>
                     <p><strong>Start:</strong> <span id="modalStart"></span></p>
                     <p><strong>End:</strong> <span id="modalEnd"></span></p>
-                    <p><strong>Attendees:</strong> <span id="modalAttendees"></span></p>
+                    <p><strong>Room:</strong> <span id="modalAttendees"></span></p>
                     <p><strong>Purpose:</strong> <span id="modalDescription"></span></p>
                 </div>
                 <div class="modal-footer">
@@ -128,7 +128,7 @@
                         start: startDate,
                         end: endDate,
                         description: booking.description,
-                        attendees: booking.attendees,
+                        room: booking.room,
                         className: className, // Assign a CSS class for styling
                     };
                 });
@@ -175,7 +175,7 @@
                         $('#modalTitle').text(event.title);
                         $('#modalStart').text(event.start.toLocaleString());
                         $('#modalEnd').text(event.end ? event.end.toLocaleString() : 'N/A');
-                        $('#modalAttendees').text(event.extendedProps.attendees || 'No attendees');
+                        $('#modalAttendees').text(event.extendedProps.room || 'No room details');
                         $('#modalDescription').text(event.extendedProps.description || 'No description');
 
                         // Show the modal

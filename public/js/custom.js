@@ -481,7 +481,7 @@ $(document).ready(function () {
 				start: startDate,
 				end: endDate,
 				description: booking.description,
-				attendees: booking.attendees,
+				room: booking.room,
 			};
 
 			console.log("Mapped Event:", event); // Log each event for debugging
@@ -524,7 +524,7 @@ $(document).ready(function () {
 					$('#modalTitle').text(event.title);
 					$('#modalStart').text(event.start.toLocaleString());
 					$('#modalEnd').text(event.end ? event.end.toLocaleString() : 'N/A');
-					$('#modalAttendees').text(event.extendedProps.attendees || 'No attendees');
+					$('#modalAttendees').text(event.extendedProps.room || 'No room details');
 					$('#modalDescription').text(event.extendedProps.description || 'No description');
 
 					// Show the modal
@@ -757,6 +757,7 @@ $(document).ready(function () {
 
 		// Get the selected date from the datepicker
 		var selectedDate = $datepicker.val();
+		var selectedRoomId = $('#roomSelect').val();
 
 
 		// Set the hidden input with the selected date
@@ -790,7 +791,8 @@ $(document).ready(function () {
 			url: '/next', // Ensure this URL matches your backend endpoint
 			type: 'POST',
 			data: {
-				date: selectedDate
+				date: selectedDate,
+				room_id: selectedRoomId // 
 			},
 			success: function (response) {
 				console.log('Date sent successfully:', response);

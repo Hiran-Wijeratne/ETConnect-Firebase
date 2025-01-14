@@ -22,7 +22,7 @@
       <div class="appointment_box">
         <div class="row">
           <div class="col-md-12">
-            <h1 class="appointment_taital">Edit <span style="color: #0cb7d6;">Bookings No <%=booking.booking_id %></span></h1>
+            <h1 class="appointment_taital">Edit <span style="color: #0cb7d6;">Bookings No <%= booking.booking_id %></span></h1>
           </div>
         </div>
         <div class="appointment_section_2">
@@ -31,19 +31,11 @@
               <div class="col-md-6">
                 <input type="hidden" name="bookingId" value="<%= booking.booking_id %>">
                 <div class="form-group">
-                    <p class="doctorname_text">Number of Attendees</p>
-                    <select class="wide" name="attendees" required>
-                        <option value="">Maximum Attendees</option>
-                        <% [2, 4, 6, 8, 10, 12].forEach(count => { %>
-                            <option value="<%= count %>" <%= booking.attendees == count ? 'selected' : '' %>><%= count %></option>
-                        <% }); %>
-                    <option value="02">02</option>
-                    <option value="04">04</option>
-                    <option value="06">06</option>
-                    <option value="08">08</option>
-                    <option value="10">10</option>
-                    <option value="12">12</option>
+                  <p class="doctorname_text">Meeting Room</p>
+                  <select class="wide" name="room_id" id="roomSelect" required>
+                    <!-- Room options will be dynamically added here -->
                   </select>
+                  <input type="hidden" name="room_name" id="hiddenRoomName" value="">
                 </div>
               </div>
               <div class="col-md-6">
@@ -55,7 +47,7 @@
             <div class="row">
               <div class="col-md-6">
                 <p class="doctorname_text">Purpose of the Meeting</p>
-                <input type="text" class="email_text" placeholder="Meeting Details" name="purpose"  value="<%= booking.description %>" required>
+                <input type="text" class="email_text" placeholder="Meeting Details" name="purpose" value="<%= booking.description %>" required>
               </div>
               <div class="col-md-6">
                 <p class="doctorname_text" style="visibility: hidden;">Submit Button Hidden Label</p>
@@ -164,4 +156,110 @@
     // Serialize the upcoming bookings as JSON
     const updatingBooking = <%- JSON.stringify(booking) %>;
 </script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+  // Your Firebase config object
+  const firebaseConfig = {
+    apiKey: "AIzaSyBr3CuAMcXz2OPveIVygpaW5GFQmO_9218",
+    authDomain: "booking-system-fdbc1.firebaseapp.com",
+    projectId: "booking-system-fdbc1",
+    storageBucket: "booking-system-fdbc1.firebasestorage.app",
+    messagingSenderId: "856434982116",
+    appId: "1:856434982116:web:826b0c0e45615cb2e000f1",
+    measurementId: "G-FRLGT31KYY"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+
+  // Firestore reference
+  const db = getFirestore(app);
+
+  async function fetchRooms() {
+    const roomsCol = collection(db, 'meeting_rooms');
+    const querySnapshot = await getDocs(roomsCol);
+    const roomSelect = document.getElementById('roomSelect');
+    console.log("Fetched Firestore data:", querySnapshot);
+
+    let defaultRoomId = "<%= booking.room_id %>"; // Booking's room_id
+
+    if (querySnapshot.empty) {
+      console.log("No rooms available in Firestore");
+      roomSelect.innerHTML = "<option>No rooms available</option>";
+      return;
+    }
+
+    // Create and append options dynamically from Firestore data
+    querySnapshot.forEach((doc) => {
+      const roomData = doc.data();
+      console.log("Room Data:", roomData);  // Log the room data for each document
+      const option = document.createElement('option');
+      option.value = doc.id;
+      option.text = roomData.name || "No Name";
+
+      roomSelect.appendChild(option);
+
+      // Set default selection based on the booking's room_id
+      if (doc.id === defaultRoomId) {
+        option.selected = true;
+      }
+    });
+
+    // Reinitialize Nice Select (if necessary)
+    $('#roomSelect').niceSelect('update');
+    console.log("Dropdown options after Nice Select:", roomSelect.options);
+  }
+
+  // Fetch the meeting rooms data from Firestore
+  fetchRooms().catch(error => console.error("Error fetching rooms:", error));
+
+  // Set up event listener to update hidden input for room name on change
+  document.addEventListener("DOMContentLoaded", () => {
+    const roomSelect = document.getElementById('roomSelect');
+
+    // Optionally, set the hidden room name if there's a preselected room
+    const initialRoomId = "<%= booking.room_id %>";
+    const initialRoomOption = Array.from(roomSelect.options).find(option => option.value === initialRoomId);
+    if (initialRoomOption) {
+      document.getElementById('hiddenRoomName').value = initialRoomOption.text;  // Set initial value
+    }
+
+    // Listen for changes and update the hidden input for room name
+    roomSelect.addEventListener('change', (event) => {
+      const selectedRoomId = event.target.value;
+      const selectedOption = event.target.options[event.target.selectedIndex];
+      const selectedRoomName = selectedOption ? selectedOption.text : '';
+
+      if (selectedRoomName) {
+        document.getElementById('hiddenRoomName').value = selectedRoomName;  // Update hidden input
+      }
+    });
+
+    // Re-fetch room names when the form is submitted and before actually submitting it
+    document.querySelector("form").addEventListener("submit", function(event) {
+      // Force update hiddenRoomName before submitting
+      const roomSelect = document.getElementById('roomSelect');
+      const selectedRoomId = roomSelect.value;
+      const selectedOption = roomSelect.options[roomSelect.selectedIndex];
+      const selectedRoomName = selectedOption ? selectedOption.text : '';
+
+      document.getElementById('hiddenRoomName').value = selectedRoomName;
+      console.log("Room Name before form submission:", selectedRoomName);  // Log for debugging
+
+      // If the room name is still empty, prevent submission and alert the user
+      if (!selectedRoomName) {
+        event.preventDefault();  // Prevent form submission if room name is empty
+        alert("Please select a room.");
+      }
+    });
+  });
+</script>
+
+
+
+
+
+
 <%- include("partials/footer.ejs") %>

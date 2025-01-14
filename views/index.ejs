@@ -34,15 +34,15 @@
             <div class="row">
               <div class="col-md-6">
                 <div class="form-group">
-                  <p class="doctorname_text">Number of Attendees</p>
-                  <select class="wide" name="attendees">
-                    <option value="">Maximum Attendees</option>
+                  <p class="doctorname_text">Meeting Room</p>
+                  <select class="wide" name="room_id" id="roomSelect">
+                    <!-- <option value="">Maximum Attendees</option>
                     <option value="02">02</option>
                     <option value="04">04</option>
                     <option value="06">06</option>
                     <option value="08">08</option>
                     <option value="10">10</option>
-                    <option value="12">12</option>
+                    <option value="12">12</option> -->
                   </select>
                 </div>
               </div>
@@ -176,20 +176,27 @@
           <h1 class="about_taital">About ETC</h1>
           <p class="about_text">Welcome to the Enabling Technology Collaboration Center at Temasek Polytechnic!
             We are a vibrant hub dedicated to innovation, where creativity meets technology.</p>
-          <% if (datesWithTooManyTimeSlots.length> 0) { %>
-            <!-- <div style="text-align: center; background-color: #f44336; color: white; padding: 20px; border-radius: 8px; margin-top: 20px;"> -->
-            <h1 style="font-size: 2.0em;">We are fully booked on:</h1>
-            <ul style="list-style-type: none;">
-              <% datesWithTooManyTimeSlots.forEach(date=> { %>
-                <li style="font-size: 1.2em; margin-right: 50px; display: inline-block;">
-                  <%= date %>
-                </li>
-                <% }); %>
-            </ul>
-            <!-- </div> -->
-            <% } %>
-              <div class="about_bt"><a href="about.html">Read More</a></div>
+        
+          <% if (Object.keys(fullyBookedRooms).length > 0) { %>
+            <h1 style="font-size: 1.8em; margin-bottom: 10px;">We are fully booked on the following dates:</h1>
+            <% Object.keys(fullyBookedRooms).forEach(room_id => { %>
+              <div style="margin-bottom: 5px;">
+                <h2 style="font-size: 1.2em; display: inline-block; margin-right: 5px;"><%= room_id %></h2>
+                <ul style="list-style-type: none; padding-left: 0; display: inline-block;">
+                  <% fullyBookedRooms[room_id].forEach(date => { %>
+                    <li style="font-size: 1.0em; margin-right: 5px; display: inline-block;">
+                      <%= date %>
+                    </li>
+                  <% }); %>
+                </ul>
+              </div>
+            <% }); %>
+          <% } %>
+        
+          <div class="about_bt"><a href="about.html">Read More</a></div>
         </div>
+        
+        
         <div class="col-md-6">
           <div class="about_img"><img src="images/about-img.png"></div>
         </div>
@@ -198,10 +205,66 @@
     <div class="padding_bottom_index">
     </div>
   </div>
+<!-- Firebase v9+ CDN Links (Modular SDK) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-  <script>
-    const user = <%= JSON.stringify(user) %>;
- </script>
- 
+  // Your Firebase config object
+  const firebaseConfig = {
+    apiKey: "AIzaSyBr3CuAMcXz2OPveIVygpaW5GFQmO_9218",
+    authDomain: "booking-system-fdbc1.firebaseapp.com",
+    projectId: "booking-system-fdbc1",
+    storageBucket: "booking-system-fdbc1.firebasestorage.app",
+    messagingSenderId: "856434982116",
+    appId: "1:856434982116:web:826b0c0e45615cb2e000f1",
+    measurementId: "G-FRLGT31KYY"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+
+  // Firestore reference
+  const db = getFirestore(app);
+
+  async function fetchRooms() {
+    const roomsCol = collection(db, 'meeting_rooms');
+    const querySnapshot = await getDocs(roomsCol);
+    const roomSelect = document.getElementById('roomSelect');
+    console.log("Fetched Firestore data:", querySnapshot);
+
+    let defaultRoomId = "E5f97aoAQpNnEC6BEg2x"; // Default Room ID
+
+    if (querySnapshot.empty) {
+      console.log("No rooms available in Firestore");
+      roomSelect.innerHTML = "<option>No rooms available</option>";
+      return;
+    }
+
+    // Create and append options dynamically
+    querySnapshot.forEach((doc) => {
+      const roomData = doc.data();
+      console.log("Room Data:", roomData);  // Log the room data for each document
+      const option = document.createElement('option');
+      option.value = doc.id;
+      option.text = roomData.name || "No Name";
+
+      roomSelect.appendChild(option);
+
+      // Set default selection if no room is selected
+      if (doc.id === defaultRoomId) {
+        option.selected = true;
+      }
+    });
+
+    // Reinitialize Nice Select
+    $('#roomSelect').niceSelect('update');
+    console.log("Dropdown options after Nice Select:", roomSelect.options);
+  }
+
+  // Fetch the meeting rooms data
+  fetchRooms().catch(error => console.error("Error fetching rooms:", error));
+</script>
+
   <!-- about section end -->
   <%- include("partials/footer.ejs") %>

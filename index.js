@@ -11,7 +11,7 @@ import moment from "moment";
 import flash from "connect-flash";
 import GoogleStrategy from "passport-google-oauth2";
 // Firebase Related import
-import { auth, db } from "./config/firebase-config.js";
+import { auth, db } from "./public/config/firebase-config.js";
 import {
   collection,
   addDoc,
@@ -202,12 +202,21 @@ app.use(async (req, res, next) => {
     const bookingsSnapshot = await getDocs(bookingsQuery);
     const bookings = bookingsSnapshot.docs.map(doc => doc.data());
 
-    // Initialize an object to track booked time slots
-    const timeSlotsByDate = {};
+    // Query Firestore to get all room names
+    const roomsSnapshot = await getDocs(collection(db, 'meeting_rooms'));
+const roomNames = roomsSnapshot.docs.reduce((acc, doc) => {
+  const roomData = doc.data();
+  const roomId = doc.id;  // Firestore document ID used as room_id
+  acc[roomId] = roomData.name; // Store the room name with roomId as key
+  return acc;
+}, {});
+
+    // Initialize an object to track booked time slots for each room and each date
+    const timeSlotsByRoomAndDate = {};
 
     // Process each booking
     for (const booking of bookings) {
-      const { date, starttime, endtime } = booking;
+      const { room_id, date, starttime, endtime } = booking;
 
       // Parse the start and end times
       const bookingStart = new Date(`${date}T${starttime}`);
@@ -223,29 +232,39 @@ app.use(async (req, res, next) => {
         timeSlots.push(new Date(slot).toISOString());
       }
 
-      // Mark booked time slots
+      // Mark booked time slots for a specific room and date
       for (let slot of timeSlots) {
         const slotTime = new Date(slot);
         if (slotTime >= bookingStart && slotTime < bookingEnd) {
-          if (!timeSlotsByDate[date]) {
-            timeSlotsByDate[date] = new Set();
+          if (!timeSlotsByRoomAndDate[room_id]) {
+            timeSlotsByRoomAndDate[room_id] = {};
           }
-          timeSlotsByDate[date].add(slot);
+          if (!timeSlotsByRoomAndDate[room_id][date]) {
+            timeSlotsByRoomAndDate[room_id][date] = new Set();
+          }
+          timeSlotsByRoomAndDate[room_id][date].add(slot);
         }
       }
     }
 
-    // Identify fully booked days (20 slots = 8 AM - 6 PM)
-    const fullyBookedDays = [];
-    for (const date in timeSlotsByDate) {
-      const bookedSlots = timeSlotsByDate[date];
-      if (bookedSlots.size === 20) {
-        fullyBookedDays.push(formatDate(new Date(date)));
+    // Identify fully booked days for each room (20 slots = 8 AM - 6 PM)
+    const fullyBookedRooms = {};
+
+    for (const room_id in timeSlotsByRoomAndDate) {
+      for (const date in timeSlotsByRoomAndDate[room_id]) {
+        const bookedSlots = timeSlotsByRoomAndDate[room_id][date];
+        if (bookedSlots.size === 20) {
+          const room_name = roomNames[room_id]; // Get the room name from the roomNames map
+          if (!fullyBookedRooms[room_name]) {
+            fullyBookedRooms[room_name] = [];
+          }
+          fullyBookedRooms[room_name].push(formatDate(new Date(date)));
+        }
       }
     }
 
     // Make data available to all templates
-    res.locals.datesWithTooManyTimeSlots = fullyBookedDays;
+    res.locals.fullyBookedRooms = fullyBookedRooms;
     res.locals.user = req.isAuthenticated() ? req.user : null;
 
     next();
@@ -254,6 +273,16 @@ app.use(async (req, res, next) => {
     next(err); // Pass the error to the next middleware
   }
 });
+
+// Example route to render fully booked rooms data
+app.get('/rooms/fully-booked', (req, res) => {
+  res.render('fullyBookedRooms', {
+    fullyBookedRooms: res.locals.fullyBookedRooms
+  });
+});
+
+
+
 
 app.get('/api/user', (req, res) => {
    const user = req.isAuthenticated() ? req.user : null;
@@ -462,8 +491,11 @@ app.get("/bookinglist", async (req, res) => {
           start_time: data.starttime || 'N/A',
           end_time: data.endtime || 'N/A',
           description: data.des || data.description || 'No description',
-          attendees: data.attendees || '2',
-          booking_date: moment(data.created_at).format("DD-MM-YYYY"),
+          room: data.room_name ? data.room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
+          booking_date: data.created_at ? 
+  (data.created_at.toDate ? moment(data.created_at.toDate()).format("YYYY-MM-DD") : moment(data.created_at).format("YYYY-MM-DD")) 
+  : 'N/A',
+
           status: status // Add status field to track whether booking is past or upcoming
         };
       });
@@ -515,8 +547,11 @@ app.get("/mybookings", async (req, res) => {
           start_time: moment(data.starttime, "HH:mm:ss").format("HH:mm")|| "Invalid", // Format start time to HH:mm
           end_time: moment(data.endtime, "HH:mm:ss").format("HH:mm") || "Invalid", // Format end time to HH:mm
           description: data.des || data.description || "No description",
-          attendees: data.attendees || "2",
-          booking_date: moment(data.created_at).format("DD-MM-YYYY"),
+          room: data.room_name ? data.room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
+          booking_date: data.created_at ? 
+  (data.created_at.toDate ? moment(data.created_at.toDate()).format("YYYY-MM-DD") : moment(data.created_at).format("YYYY-MM-DD")) 
+  : 'N/A',
+
           isPast: bookingEndTime.isBefore(moment(`${currentDate} ${currentTime}`, "YYYY-MM-DD HH:mm:ss"), "minute"), // Check if booking has already passed
           rawDate: moment(data.date, "YYYY-MM-DD"), // Raw date for sorting
           rawEndTime: moment(data.endtime, "HH:mm:ss"), // Raw time for sorting
@@ -591,48 +626,54 @@ app.get('/edit-booking/:id', async (req, res) => {
 
 
 app.post('/edit', async (req, res) => {
+  console.log("Form data received:", req.body);
   if (req.isAuthenticated()) {
-    const { bookingId, attendees, date, start, end, purpose } = req.body;
+    console.log("Request Body:", req.body);
+    const { bookingId, room_id, date, start, end, purpose } = req.body;
 
-    // Set default values if attendees or purpose are not provided
-    const updatedAttendees = attendees || 2;
     const updatedPurpose = purpose || 'Not Stated';
 
     // Reformat date to YYYY-MM-DD
     const [day, month, year] = date.split('-');
-    const formattedDate = `${year}-${month}-${day}`;
+    const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
     const formattedStartTime = moment(start, 'HH:mm').format('HH:mm:ss');
     const formattedEndTime = moment(end, 'HH:mm').format('HH:mm:ss');
 
-
     try {
-      const bookingRef = doc(db, "bookings", bookingId);
+      // Step 1: Fetch room details (name and capacity) from the database using room_id
+      const roomDoc = await getDoc(doc(db, "meeting_rooms", room_id));
+      if (!roomDoc.exists()) {
+        return res.status(404).send("Room not found");
+      }
+      const roomData = roomDoc.data();
+      const room_name = `${roomData.name} (Capacity: ${roomData.capacity})`;
 
-      // Step 1: Update the booking details in Firestore
+      // Step 2: Update the booking details in Firestore
+      const bookingRef = doc(db, "bookings", bookingId);
       await updateDoc(bookingRef, {
         date: formattedDate,
         starttime: formattedStartTime,
         endtime: formattedEndTime,
-        des: updatedPurpose,
-        attendees: updatedAttendees,
+        description: updatedPurpose,
+        room_id: room_id,
+        room_name: room_name,
         created_at: new Date().toISOString(),
       });
 
-      // Step 2: Delete existing timeslots associated with the booking
+      // Step 3: Delete existing timeslots associated with the booking
       const timeslotsQuery = query(
         collection(db, "timeslots"),
         where("booking_id", "==", bookingId)
       );
       const timeslotsSnapshot = await getDocs(timeslotsQuery);
 
-      // Delete each timeslot document
       const deletePromises = timeslotsSnapshot.docs.map((doc) =>
         deleteDoc(doc.ref)
       );
       await Promise.all(deletePromises);
 
-      // Step 3: Generate and insert new timeslots
+      // Step 4: Generate and insert new timeslots
       const timeslots = [];
       let startTime = new Date(`1970-01-01T${start}`);
       let endTime = new Date(`1970-01-01T${end}`);
@@ -647,17 +688,16 @@ app.post('/edit', async (req, res) => {
           timeslot: slotTime,
         });
 
-        // Increment the start time by 30 minutes
-        startTime.setMinutes(startTime.getMinutes() + 30);
+        startTime.setMinutes(startTime.getMinutes() + 15);
       }
 
       res.render("confirmation.ejs", {
         booking: {
           id: bookingId,
-          date: `${day}-${month}-${year}`, // Reformat for display
+          date: `${day}-${month}-${year}`,
           startTime: start,
           endTime: end,
-          attendees: updatedAttendees,
+          room: room_name ? room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
           purpose: updatedPurpose,
         },
         timeslots,
@@ -671,90 +711,94 @@ app.post('/edit', async (req, res) => {
   }
 });
 
-app.post('/next', async (req, res) => {
-  const { date } = req.body; // selectedDate from frontend
 
-  // Reformat date to YYYY-MM-DD format
-  const [day, month, year] = date.split('-');
-  const formattedDate = `${year}-${month}-${day}`;
+app.post('/next', async (req, res) => {
+  const { room_id, date, purpose, start, end } = req.body;
+
+  // Validate required fields
+  if (!room_id || !date) {
+    return res.status(400).send('room_id and date are required');
+  }
+
+  // Reformat date to YYYY-MM-DD
+  let formattedDate;
+  try {
+    const [day, month, year] = date.split('-');
+    formattedDate = `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error('Invalid date format:', date);
+    return res.status(400).send('Invalid date format');
+  }
 
   try {
-    // Step 1: Query the bookings collection to get bookings for the selected date
-    const bookingsRef = collection(db, "bookings");
-    const bookingsQuery = query(bookingsRef, where("date", "==", formattedDate));
+    // Fetch room details from Firestore
+    const roomDoc = await getDoc(doc(db, 'meeting_rooms', room_id));
+    if (!roomDoc.exists()) {
+      console.error('Room not found for room_id:', room_id);
+      return res.status(400).send('Room not found');
+    }
+
+    const roomName = `${roomDoc.data().name} (Capacity: ${roomDoc.data().capacity})`;
+
+    // Validate roomName and formattedDate
+    if (!formattedDate || !roomName) {
+      console.error('Invalid query parameters:', { formattedDate, roomName });
+      return res.status(400).send('Invalid query parameters');
+    }
+
+    // Query Firestore for bookings on the given date and room
+    const bookingsRef = collection(db, 'bookings');
+    const bookingsQuery = query(
+      bookingsRef,
+      where('date', '==', formattedDate),
+      where('room_name', '==', roomName)
+    );
+
     const bookingsSnapshot = await getDocs(bookingsQuery);
 
-    // If no bookings found, send an empty response
     if (bookingsSnapshot.empty) {
       return res.json({ timeslots: [], end_times: [], start_times: [], booking_ids: [] });
     }
 
-    // Step 2: Extract booking data
-    const bookings = [];
-    bookingsSnapshot.forEach(doc => {
-      bookings.push({ id: doc.id, ...doc.data() });
-    });
-
-    // Step 3: Calculate timeslots dynamically
-    const timeslots = []; // Array to store calculated timeslots
+    const timeslots = [];
     const endTimes = [];
     const startTimes = [];
     const bookingIds = [];
 
-    bookings.forEach((booking, index) => {
-      const { starttime, endtime } = booking; // Assuming starttime and endtime are strings like "09:30" and "10:30"
-      
-      console.log(`Booking #${index + 1}:`);
-      console.log(`Start Time: ${starttime}`);
-      console.log(`End Time: ${endtime}`);
+    bookingsSnapshot.forEach((doc) => {
+      const { starttime, endtime } = doc.data();
 
-      // let currentTime = new Date(`1970-01-01T${starttime}:00`); // Convert starttime to a Date object
-      // const endTime = new Date(`1970-01-01T${endtime}:00`); // Convert endtime to a Date object
+      const [startHours, startMinutes] = starttime.split(':').map(Number);
+      const [endHours, endMinutes] = endtime.split(':').map(Number);
 
-      // Create valid date objects from starttime and endtime
-      const startParts = starttime.split(":");
-      const endParts = endtime.split(":");
-
-      // Use a fixed date (e.g., "1970-01-01") and add hours and minutes
-      const startDateTime = new Date(1970, 0, 1, parseInt(startParts[0]), parseInt(startParts[1]));
-      const endDateTime = new Date(1970, 0, 1, parseInt(endParts[0]), parseInt(endParts[1]));
-
-      console.log("Start Time:", startDateTime);
-      console.log("End Time:", endDateTime);
+      const startDateTime = new Date(1970, 0, 1, startHours, startMinutes);
+      const endDateTime = new Date(1970, 0, 1, endHours, endMinutes);
 
       let currentTime = startDateTime;
-      // Generate timeslots, but exclude the endtime
       while (currentTime < endDateTime) {
-        // Format the current time as "HH:mm" and add it to the timeslots array
-        const slot = currentTime.toTimeString().substring(0, 5); // Get "HH:mm"
+        const slot = currentTime.toTimeString().substring(0, 5);
         timeslots.push(slot);
-
-        console.log(`Added Timeslot: ${slot}`);
-
-        // Increment the current time by 30 minutes
         currentTime.setMinutes(currentTime.getMinutes() + 15);
-
-        console.log(`Current Time (after increment): ${currentTime}`);
       }
 
-      endTimes.push(endtime); // Add endtime to the list
-      startTimes.push(starttime); // Add starttime to the list
-      bookingIds.push(booking.id); // Add booking_id to the list
+      startTimes.push(starttime);
+      endTimes.push(endtime);
+      bookingIds.push(doc.id);
     });
 
-    // Step 4: Send the calculated timeslots, start_times, and end_times to the frontend
-    console.log(`Final Timeslots: ${timeslots}`);
     res.json({ timeslots, end_times: endTimes, start_times: startTimes, booking_ids: bookingIds });
+
   } catch (error) {
     console.error('Error fetching timeslots and end_times:', error);
     res.status(500).send('Error fetching timeslots and end_times');
   }
 });
 
+
 app.post('/submit', async (req, res) => {
   if (req.isAuthenticated()) {
-    let { attendees, date, start, end, purpose } = req.body;
-    attendees = attendees || 2; // Default attendees
+    let { room_id, date, start, end, purpose } = req.body;
+    room_id = room_id || null; // Default room ID (null if not selected)
     purpose = purpose || 'Not Stated'; // Default purpose
 
     // Reformat the date
@@ -762,25 +806,33 @@ app.post('/submit', async (req, res) => {
     const formattedDate = `${year}-${month}-${day}`;
 
     try {
-      // Step 1: Insert booking details into Firestore
+      // Step 1: Fetch the room name and capacity based on room_id
+      let roomName = null;
+      if (room_id) {
+        const roomDoc = await getDoc(doc(db, 'meeting_rooms', room_id));
+        if (roomDoc.exists()) {
+          const roomData = roomDoc.data();
+          const capacity = roomData.capacity || "Unknown"; // Fetch room capacity (default "Unknown" if not available)
+          roomName = `${roomData.name} (Capacity: ${capacity})`; // Combine room name and capacity
+        }
+      }
+
+      // Step 2: Insert booking details into Firestore
       const bookingData = {
-        user_id: req.user.uid, // Use the authenticated user's UID
+        // user_id: req.user.uid, // Use the authenticated user's UID
         name: req.user.email || "Anonymous", // Add user's name if available
         email: req.user.email, // Add user's email
         date: formattedDate,
         starttime: start,
         endtime: end,
-        des: purpose,
-        attendees: attendees,
+        description: purpose,
         created_at: new Date().toISOString(), // Use ISO format for created_at
-        room_id: null, // Optional: Add a room ID if needed
-        room_name: null, // Optional: Add a room name if needed
+        room_id: room_id, // Include the selected room's ID
+        room_name: roomName, // Include the selected room's name with capacity
       };
 
       // Add the booking data to the "bookings" collection
       const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
-
-      // Step 2: No need to generate or store timeslots, so we remove that part
 
       // Step 3: Prepare data for the confirmation page
       const queryParams = new URLSearchParams({
@@ -788,7 +840,7 @@ app.post('/submit', async (req, res) => {
         date: formattedDate,
         startTime: start,
         endTime: end,
-        attendees: attendees,
+        room: roomName || "Room 1",
         purpose: purpose,
       }).toString();
 
@@ -804,6 +856,8 @@ app.post('/submit', async (req, res) => {
     res.redirect('/login');
   }
 });
+
+
 
 
 app.get('/calendarPage', async (req, res) => {
@@ -855,7 +909,7 @@ app.get('/calendarPage', async (req, res) => {
           start_time: data.starttime || 'N/A',
           end_time: data.endtime || 'N/A',
           description: data.des || data.description || 'No description',
-          attendees: data.attendees || '2',
+          room: data.room_name ? data.room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
           booking_date: moment(data.created_at).format("DD-MM-YYYY"),
           status: status // Add status field to track whether booking is past or upcoming+
         };

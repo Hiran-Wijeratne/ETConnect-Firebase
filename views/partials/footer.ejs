@@ -131,9 +131,6 @@
 
 <!-- Datepicker Javascript -->
 <script>
-   // Get the fully booked dates array from the server
-  const fullyBookedDates = <%- JSON.stringify(datesWithTooManyTimeSlots) %>;
-  
 
    var today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
    var $datepicker = $('#datepicker').datepicker({
@@ -146,7 +143,7 @@
       uiLibrary: 'bootstrap5',
       iconsLibrary: 'fontawesome',
       minDate: today,
-      disableDates: fullyBookedDates,
+      // disableDates: fullyBookedDates,
       change: function (e) {
         // Call a global function when the date changes
         onDateChange($(this));
@@ -162,10 +159,10 @@
 
 <script>new DataTable('table.display');</script>
 
-<script>
+<!-- <script>
    const user = <%= JSON.stringify(user) %>;
    console.log(user); // Now `user` is accessible in the frontend
-</script>
+</script> -->
 
 
 </body>
