@@ -782,25 +782,6 @@ $(document).ready(function () {
 				return `${hours}:${minutes}`; // Return hours and minutes
 			}
 
-
-			// // If it's a Date object, convert it to HH:mm:ss format
-			// if (time instanceof Date) {
-			// 	const hours = time.getHours().toString().padStart(2, '0');
-			// 	const minutes = time.getMinutes().toString().padStart(2, '0');
-			// 	const seconds = time.getSeconds().toString().padStart(2, '0');
-			// 	return `${hours}:${minutes}`;
-			// }
-
-			// // If it's a number (timestamp), convert it to a Date and format it
-			// if (typeof time === 'number') {
-			// 	const date = new Date(time);
-			// 	const hours = date.getHours().toString().padStart(2, '0');
-			// 	const minutes = date.getMinutes().toString().padStart(2, '0');
-			// 	const seconds = date.getSeconds().toString().padStart(2, '0');
-			// 	return `${hours}:${minutes}`;
-			// }
-
-			// Return null for unexpected types
 			return null;
 		}
 
@@ -969,7 +950,7 @@ $(document).ready(function () {
 						const slotTime = `${commenceTime.getHours().toString().padStart(2, '0')}:` +
 							`${commenceTime.getMinutes().toString().padStart(2, '0')}`;
 						generatedTimeslots.push(slotTime);
-						commenceTime.setMinutes(commenceTime.getMinutes() + 30);
+						commenceTime.setMinutes(commenceTime.getMinutes() + 15);
 					}
 
 					console.log('Generated Timeslots for Updating Booking:', generatedTimeslots);
@@ -995,6 +976,9 @@ $(document).ready(function () {
 					});
 
 				}
+				
+				
+
 
 				$('select').niceSelect('update');
 			},
@@ -1055,7 +1039,7 @@ $(document).ready(function () {
 				const slotTime = `${commenceTime.getHours().toString().padStart(2, '0')}:` +
 					`${commenceTime.getMinutes().toString().padStart(2, '0')}`;
 				generatedUpdatingTimeslots.push(slotTime);
-				commenceTime.setMinutes(commenceTime.getMinutes() + 30);
+				commenceTime.setMinutes(commenceTime.getMinutes() + 15);
 			}
 
 			const matchingItems = generatedUpdatingTimeslots.filter(item => timeslots.includes(item));
@@ -1081,7 +1065,7 @@ $(document).ready(function () {
 					`${commenceTime.getMinutes().toString().padStart(2, '0')}`;
 				generatedTimeslots.push(slotTime);
 				// Increment the start time by 1 hour
-				commenceTime.setMinutes(commenceTime.getMinutes() + 30);
+				commenceTime.setMinutes(commenceTime.getMinutes() + 15);
 			}
 
 			console.log(`timeslots : ${timeslots}`);

@@ -71,21 +71,26 @@
 </head>
 <body>
 
-<div class="confirmation-page">
-  <div class="card">
-    <div class="card-header">
-      Booking Deleted
-    </div>
-    <div class="card-body">
-      <div class="cancel-icon">
-        <i class="material-icons">cancel</i> <!-- Material Icons Cancel -->
+  <div class="confirmation-page">
+    <div class="card">
+      <div class="card-header">
+        Booking Deleted
       </div>
-      <p>Your booking with ID <strong><%= bookingId %></strong> has been successfully deleted.</p>
-      <p>We hope to serve you again in the future!</p>
-      <button class="btn btn-home" onclick="window.location.href='/'">Go to Homepage</button>
+      <div class="card-body">
+        <div class="cancel-icon">
+          <i class="material-icons">cancel</i> <!-- Material Icons Cancel -->
+        </div>
+        <p>Your booking with ID <strong><%= bookingId %></strong> has been successfully deleted.</p>
+        <p>We hope to serve you again in the future!</p>
+        
+        <!-- Go to Homepage Button -->
+        <button class="btn btn-home" onclick="window.location.href='/'">Go to Homepage</button>
+        
+        <!-- Go to My Bookings Page Button -->
+        <button class="btn btn-home" onclick="window.location.href='/mybookings'">Go to My Bookings Page</button>
+      </div>
     </div>
   </div>
-</div>
 
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>

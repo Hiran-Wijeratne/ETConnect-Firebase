@@ -427,8 +427,8 @@ app.get("/bookinglist", async (req, res) => {
       collection(db, "bookings"),
       where("date", "<", currentDateString),
       where("date", ">=", pastLimitDate),
-      orderBy("date", "asc"),
-      orderBy("starttime", "asc")
+      orderBy("date", "desc"),
+      orderBy("starttime", "desc")
     );
 
     const upcomingSnapshot = await getDocs(upcomingQuery);
@@ -455,8 +455,8 @@ app.get("/bookinglist", async (req, res) => {
           date: bookingDate.format("DD-MM-YYYY"),
           start_time: data.starttime || 'N/A',
           end_time: data.endtime || 'N/A',
-          description: data.des || 'No description',
-          attendees: data.attendees || 'No attendees',
+          description: data.des || data.description || 'No description',
+          attendees: data.attendees || '2',
           booking_date: moment(data.created_at).format("DD-MM-YYYY"),
           status: status // Add status field to track whether booking is past or upcoming
         };
@@ -479,6 +479,191 @@ app.get("/bookinglist", async (req, res) => {
   }
 });
 
+
+app.get("/mybookings", async (req, res) => {
+  if (req.isAuthenticated()) {
+    const currentDate = moment().format("YYYY-MM-DD");
+    const currentTime = moment().format("HH:mm:ss");
+    const userEmail = req.user.email; // Assuming user email is stored in Firebase users
+
+    try {
+      // Fetch all bookings for the logged-in user
+      const allBookingsQuery = query(
+        collection(db, "bookings"),
+        where("email", "==", userEmail), // Filter by logged-in user's email
+        orderBy("date", "asc"), // Sort by date first
+        orderBy("starttime", "asc") // Then sort by start time
+      );
+
+      const bookingsSnapshot = await getDocs(allBookingsQuery);
+
+      // Format and classify bookings into "upcoming" and "past"
+      const formattedBookings = bookingsSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        const bookingEndTime = moment(`${data.date} ${data.endtime}`, "YYYY-MM-DD HH:mm:ss");
+
+        return {
+          booking_id: doc.id,
+          username: data.email || "Unknown", // Default to 'Unknown' if 'email' is missing
+          date: moment(data.date).format("DD-MM-YYYY"),
+          start_time: moment(data.starttime, "HH:mm:ss").format("HH:mm")|| "Invalid", // Format start time to HH:mm
+          end_time: moment(data.endtime, "HH:mm:ss").format("HH:mm") || "Invalid", // Format end time to HH:mm
+          description: data.des || data.description || "No description",
+          attendees: data.attendees || "2",
+          booking_date: moment(data.created_at).format("DD-MM-YYYY"),
+          isPast: bookingEndTime.isBefore(moment(`${currentDate} ${currentTime}`, "YYYY-MM-DD HH:mm:ss"), "minute"), // Check if booking has already passed
+          rawDate: moment(data.date, "YYYY-MM-DD"), // Raw date for sorting
+          rawEndTime: moment(data.endtime, "HH:mm:ss"), // Raw time for sorting
+        };
+      });
+
+      // Separate past and upcoming bookings
+      const pastBookings = formattedBookings
+        .filter((booking) => booking.isPast) // Only include past bookings
+        .sort((a, b) => {
+          const dateComparison = b.rawDate.diff(a.rawDate); // Compare by date (descending)
+          if (dateComparison === 0) {
+            // If dates are the same, compare by end time (descending)
+            return b.rawEndTime.diff(a.rawEndTime);
+          }
+          return dateComparison;
+        });
+
+      const upcomingBookings = formattedBookings.filter((booking) => !booking.isPast); // Only include upcoming bookings
+
+      // Render the bookings in the mybookings.ejs view
+      res.render("mybookings.ejs", {
+        upcomingMyBookings: upcomingBookings,
+        pastMyBookings: pastBookings,
+      });
+    } catch (err) {
+      console.error("Error retrieving your bookings:", err);
+      res.status(500).send("Error retrieving your bookings.");
+    }
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.get('/edit-booking/:id', async (req, res) => {
+  if (req.isAuthenticated()) {
+    const booking_id = req.params.id;
+
+    try {
+      // Query only the specific booking by booking_id in Firestore
+      const bookingDocRef = doc(db, "bookings", booking_id);
+      const bookingDoc = await getDoc(bookingDocRef);
+
+      if (!bookingDoc.exists()) {
+        return res.status(404).send('Booking not found');
+      }
+
+      // Use the booking data as needed
+      const booking = bookingDoc.data();
+      booking.booking_id = bookingDoc.id; // Add the document ID as booking_id
+      if (booking.des) {
+        booking.description = booking.des;
+        delete booking.des; // Remove the original 'des' field to avoid confusion
+      }
+
+
+      // Format the date to DD-MM-YYYY
+      booking.date = moment(booking.date).format('DD-MM-YYYY');
+      booking.start_time = moment(booking.starttime, 'HH:mm:ss').format('HH:mm'); // Adjust format as needed
+      booking.end_time = moment(booking.endtime, 'HH:mm:ss').format('HH:mm'); // Adjust format as needed
+
+      // Render the booking data into editBookings.ejs
+      res.render('editBookings.ejs', { booking });
+    } catch (error) {
+      console.error('Error fetching booking:', error);
+      res.status(500).send('Server error');
+    }
+  } else {
+    res.redirect("/login");
+  }
+});
+
+
+app.post('/edit', async (req, res) => {
+  if (req.isAuthenticated()) {
+    const { bookingId, attendees, date, start, end, purpose } = req.body;
+
+    // Set default values if attendees or purpose are not provided
+    const updatedAttendees = attendees || 2;
+    const updatedPurpose = purpose || 'Not Stated';
+
+    // Reformat date to YYYY-MM-DD
+    const [day, month, year] = date.split('-');
+    const formattedDate = `${year}-${month}-${day}`;
+
+    const formattedStartTime = moment(start, 'HH:mm').format('HH:mm:ss');
+    const formattedEndTime = moment(end, 'HH:mm').format('HH:mm:ss');
+
+
+    try {
+      const bookingRef = doc(db, "bookings", bookingId);
+
+      // Step 1: Update the booking details in Firestore
+      await updateDoc(bookingRef, {
+        date: formattedDate,
+        starttime: formattedStartTime,
+        endtime: formattedEndTime,
+        des: updatedPurpose,
+        attendees: updatedAttendees,
+        created_at: new Date().toISOString(),
+      });
+
+      // Step 2: Delete existing timeslots associated with the booking
+      const timeslotsQuery = query(
+        collection(db, "timeslots"),
+        where("booking_id", "==", bookingId)
+      );
+      const timeslotsSnapshot = await getDocs(timeslotsQuery);
+
+      // Delete each timeslot document
+      const deletePromises = timeslotsSnapshot.docs.map((doc) =>
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(deletePromises);
+
+      // Step 3: Generate and insert new timeslots
+      const timeslots = [];
+      let startTime = new Date(`1970-01-01T${start}`);
+      let endTime = new Date(`1970-01-01T${end}`);
+
+      while (startTime < endTime) {
+        const slotTime = startTime.toTimeString().substring(0, 5);
+        timeslots.push(slotTime);
+
+        // Add each new timeslot to Firestore
+        await addDoc(collection(db, "timeslots"), {
+          booking_id: bookingId,
+          timeslot: slotTime,
+        });
+
+        // Increment the start time by 30 minutes
+        startTime.setMinutes(startTime.getMinutes() + 30);
+      }
+
+      res.render("confirmation.ejs", {
+        booking: {
+          id: bookingId,
+          date: `${day}-${month}-${year}`, // Reformat for display
+          startTime: start,
+          endTime: end,
+          attendees: updatedAttendees,
+          purpose: updatedPurpose,
+        },
+        timeslots,
+      });
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      res.status(500).send("Error updating booking");
+    }
+  } else {
+    res.redirect("/login");
+  }
+});
 
 
 
@@ -577,7 +762,7 @@ app.post('/submit', async (req, res) => {
       // Step 1: Insert booking details into Firestore
       const bookingData = {
         user_id: req.user.uid, // Use the authenticated user's UID
-        name: req.user.name || "Anonymous", // Add user's name if available
+        name: req.user.email || "Anonymous", // Add user's name if available
         email: req.user.email, // Add user's email
         date: formattedDate,
         starttime: start,
@@ -592,24 +777,7 @@ app.post('/submit', async (req, res) => {
       // Add the booking data to the "bookings" collection
       const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
 
-      // Step 2: Generate timeslots and store them in Firestore (if needed)
-      const timeslots = [];
-      let startTime = new Date(`1970-01-01T${start}`); // Convert start time to Date object
-      let endTime = new Date(`1970-01-01T${end}`); // Convert end time to Date object
-
-      while (startTime < endTime) {
-        const slotTime = startTime.toTimeString().substring(0, 5); // Format to "HH:mm"
-        timeslots.push(slotTime);
-
-        // Increment time by 30 minutes
-        startTime.setMinutes(startTime.getMinutes() + 30);
-      }
-
-      // Optionally, add the timeslots to Firestore (e.g., subcollection or separate document)
-      await setDoc(doc(db, "bookings", bookingRef.id), {
-        ...bookingData,
-        timeslots, // Add the generated timeslots
-      });
+      // Step 2: No need to generate or store timeslots, so we remove that part
 
       // Step 3: Prepare data for the confirmation page
       const queryParams = new URLSearchParams({
@@ -683,10 +851,10 @@ app.get('/calendarPage', async (req, res) => {
           date: bookingDate.format("DD-MM-YYYY"),
           start_time: data.starttime || 'N/A',
           end_time: data.endtime || 'N/A',
-          description: data.des || 'No description',
-          attendees: data.attendees || 'No attendees',
+          description: data.des || data.description || 'No description',
+          attendees: data.attendees || '2',
           booking_date: moment(data.created_at).format("DD-MM-YYYY"),
-          status: status // Add status field to track whether booking is past or upcoming
+          status: status // Add status field to track whether booking is past or upcoming+
         };
       });
     };
@@ -706,6 +874,45 @@ app.get('/calendarPage', async (req, res) => {
     console.error("Error retrieving bookings:", err);
     res.status(500).send("Error retrieving bookings.");
   }
+});
+
+app.get('/delete/:id', async (req, res) => {   
+  if (req.isAuthenticated()) {
+    const bookingId = req.params.id; // Extract bookingId from the URL
+    const userEmail = req.user.email; // Get the email of the logged-in user
+
+    try {
+      const bookingRef = doc(db, "bookings", bookingId);
+      const bookingSnap = await getDoc(bookingRef);
+  
+      if (!bookingSnap.exists()) {
+        return res.status(404).send("Booking not found");
+      }
+  
+      // Verify that the booking belongs to the current user
+      const bookingData = bookingSnap.data();
+      if (bookingData.email !== userEmail) {
+        return res.status(403).send("Not authorized to delete this booking");
+      }
+  
+      await deleteDoc(bookingRef);
+      res.render('delete-confirmation.ejs', {
+        bookingId: req.params.id,
+        user: req.session.user
+      });
+    } catch (error) {
+      console.error('Error deleting booking:', error);
+      res.status(500).send('Error deleting booking');
+    }
+  } else {
+    res.redirect('/login');
+  }
+});
+
+
+// Delete confirmation route
+app.get('/delete-confirmation', (req, res) => {
+  res.render('delete-confirmation.ejs');
 });
 
 
