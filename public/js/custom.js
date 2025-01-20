@@ -1211,3 +1211,100 @@ if (isToday) {
 
 
 
+///Admin Penel Related JS
+ // Toggle all checkboxes
+ function toggleAll() {
+	const bulkSelectAll = document.getElementById("bulk-select-all");
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox");
+	checkboxes.forEach((checkbox) => {
+	  checkbox.checked = bulkSelectAll.checked;
+	});
+	toggleDeleteButton();
+  }
+
+  // Show or hide the delete button depending on selected checkboxes
+  function toggleDeleteButton() {
+	const selectedItems = document.querySelectorAll('.bulk-select-checkbox:checked');
+	const deleteButton = document.getElementById('deleteButton');
+	deleteButton.style.display = selectedItems.length > 0 ? 'inline-block' : 'none';
+  }
+
+  // Delete selected rooms
+  function deleteSelected() {
+	const selectedRows = document.querySelectorAll('.bulk-select-checkbox:checked');
+	selectedRows.forEach((checkbox) => {
+	  const row = checkbox.closest('tr');
+	  row.remove();
+	});
+	toggleDeleteButton();
+  }
+
+  // Delete individual row
+  function deleteRow(button) {
+	const row = button.closest('tr');
+	row.remove();
+  }
+
+
+  ///Edit Room Form related Java Script
+  // Show the edit form with the room's data populated
+  function showEditForm(roomId) {
+	// Find the row with the matching room ID
+	const row = document.querySelector(`tr[data-room-id="${roomId}"]`);
+  
+	// Ensure the row exists
+	if (row) {
+	  // Populate the form with the room data
+	  document.getElementById('editRoomId').value = roomId;
+	  document.getElementById('editRoomName').value = row.querySelector('.room-name').innerText;
+	  document.getElementById('editRoomCapacity').value = row.querySelector('.room-capacity').innerText;
+	  document.getElementById('editRoomFacilities').value = row.querySelector('.room-facilities').innerText;
+	  document.getElementById('editRoomAvailability').value = row.querySelector('.room-availability').innerText === 'Available' ? 'true' : 'false';
+  
+	  // Show the edit form
+	  document.getElementById('editFormContainer').classList.remove('hidden');
+	} else {
+	  console.error("Room row not found!");
+	}
+  }
+  
+  
+  
+  // Close the edit form
+  function closeEditForm() {
+	document.getElementById('editFormContainer').classList.add('hidden');
+  }
+  
+  // Handle the form submission
+  function showEditForm(roomId) {
+    // Find the row with the matching room ID
+    const row = document.querySelector(`tr[data-room-id="${roomId}"]`);
+
+    // Ensure the row exists
+    if (row) {
+        // Populate the form with the room data
+        document.getElementById('editRoomId').value = roomId;
+        document.getElementById('editRoomName').value = row.querySelector('.room-name').innerText;
+        document.getElementById('editRoomCapacity').value = row.querySelector('.room-capacity').innerText;
+        document.getElementById('editRoomFacilities').value = row.querySelector('.room-facilities').innerText;
+        document.getElementById('editRoomAvailability').value = row.querySelector('.room-availability').innerText === 'Available' ? 'true' : 'false';
+
+        // Update the form action to point to the correct endpoint with the room ID
+        const form = document.getElementById('editRoomForm');
+        form.action = `/update-room/${roomId}`;
+
+        // Show the edit form
+        document.getElementById('editFormContainer').classList.remove('hidden');
+    } else {
+        console.error("Room row not found!");
+    }
+}
+
+  
+
+  
+  
+
+
+
+

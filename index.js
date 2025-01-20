@@ -6,150 +6,105 @@ import passport from "passport";
 import { Strategy } from "passport-local";
 import session from "express-session";
 import env from "dotenv";
-import axios from "axios";
 import moment from "moment";
 import flash from "connect-flash";
 import GoogleStrategy from "passport-google-oauth2";
-// Firebase Related import
-import { auth, db } from "./public/config/firebase-config.js";
+// Firebase Related Import
+import {db} from "./public/config/firebase-config.js";
 import {
   collection,
   addDoc,
   query,
   where,
   getDocs,
-  setDoc,
   doc,
   orderBy,
   updateDoc,
   deleteDoc,
-  serverTimestamp,
   getDoc
 } from "firebase/firestore";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup
-} from "firebase/auth";
-import { OAuth2Client } from "google-auth-library";
-//AdminJS Related Imports
-import AdminJS from 'adminjs';
-import AdminJSExpress from '@adminjs/express';
-import { Sequelize } from 'sequelize';
-import AdminJSSequelize from '@adminjs/sequelize';
+
+
 // import UserModel from './models/user.entity.js';
 import { DataTypes } from 'sequelize';
-// import { pool } from './db'; // Assuming you are using pool from pg package
+
+
+
+
+
+
 
 const app = express();
 const port = 3000;
 const saltRounds = 10;
 env.config();
 
+app.use(express.static("public"));
+app.use(bodyParser.urlencoded({ extended: true }));
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Initialize Sequelize
-// const sequelize = new Sequelize({
-//   dialect: 'postgres',
-//   username: process.env.DB_USER,
-//   host: process.env.DB_HOST,
-//   database: process.env.DB_NAME,
-//   password: process.env.DB_PASSWORD,
-// });
+///Admin Panel Related Code
 
 
 
-// AdminJS.registerAdapter(AdminJSSequelize);
+app.get("/dashboard", (req, res) => {
+  const currentDate = moment().format('DD/MM/YYYY'); // Format date using moment
+  res.render("dashboard.ejs", { currentDate });
+});
 
 
-// const UserModel = sequelize.define(
-//   'User',
-//   {
-//     user_id: {
-//       type: DataTypes.INTEGER,
-//       primaryKey: true,
-//       autoIncrement: true,
-//     },
-//     username: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
-//     password: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
-//     role: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//       defaultValue: 'user', // Default role
-//     },
-//   },
-//   {
-//     tableName: 'users', // Map this model to your `users` table
-//     timestamps: false,  // Disable timestamps if they are not in the table
-//   }
-// );
+app.get("/room", async (req, res) => {
+  try {
+    // Get a reference to the 'meeting_rooms' collection
+    const roomsCollectionRef = collection(db, "meeting_rooms");
+
+    // Get the documents from the collection
+    const snapshot = await getDocs(roomsCollectionRef);
+
+    // If no rooms are found, handle the case
+    if (snapshot.empty) {
+      return res.status(404).send("No rooms found");
+    }
+
+    // Map the snapshot to an array of room objects
+    const rooms = snapshot.docs.map(doc => ({
+      id: doc.id, // Firestore document ID
+      ...doc.data() // Get the data of the document
+    }));
+
+    // Pass the rooms data to the EJS template
+    res.render("room.ejs", { rooms });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error retrieving rooms data.");
+  }
+});
+
+app.post('/update-room/:roomId', async (req, res) => {
+  const { roomId } = req.params; // Get roomId from the URL parameter
+  const { roomName, capacity, facilities, availability } = req.body;
+
+  try {
+    const roomRef = doc(db, "meeting_rooms", roomId);
+    await updateDoc(roomRef, {
+      name: roomName,
+      capacity: capacity,
+      facilities: facilities,
+      available: availability,
+    });
+
+    res.redirect("/room");
+  } catch (error) {
+    console.error("Error updating room:", error);
+    res.status(500).send("Error updating room");
+  }
+});
 
 
-// // Initialize AdminJS
-// const adminJS = new AdminJS({
-//   databases: [sequelize],  // Pass your sequelize instance
-//   rootPath: '/admin',  // Set custom admin path
-//   // resources: [{
-//   //   resource: UserModel,  // Your user Sequelize model
-//   //   options: {
-//   //     actions: {
-//   //       edit: {
-//   //         isAccessible: ({ currentAdmin }) => currentAdmin.role === 'superadmin',
-//   //       },
-//   //       delete: {
-//   //         isAccessible: ({ currentAdmin }) => currentAdmin.role === 'superadmin',
-//   //       },
-//   //       new: {
-//   //         isAccessible: ({ currentAdmin }) => currentAdmin.role === 'superadmin',
-//   //       },
-//   //     },
-//   //   },
-//   // }],
-//   branding: {
-//     companyName: 'ETConnect',  // Custom branding (optional)
-//   },
-// });
-
-// const router = AdminJSExpress.buildRouter(adminJS);
-
-// // Use AdminJS routes
-// app.use(adminJS.options.rootPath, router);
-
-// app.use('/admin', (req, res, next) => {
-//   if (!req.isAuthenticated()) {
-//     return res.redirect('/login');  // redirect if not authenticated
-//   }
-  
-//   // Assuming user role is stored in req.user
-//   if (req.user.role !== 'superadmin') {
-//     return res.status(403).send('Forbidden');  // Send 403 for non-admin users
-//   }
-  
-//   next();  // Continue to the AdminJS route
-// });
 
 
-// app.use('/admin', (req, res, next) => {
-//   if (!req.isAuthenticated()) {
-//     return res.redirect('/login');  // Redirect unauthenticated users to login
-//   }
-  
-//   if (req.user.role !== 'superadmin') {
-//     return res.status(403).send('Forbidden');  // Block non-superadmin users
-//   }
-  
-//   next();  // Allow access for superadmin
-// });
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 app.use(
@@ -175,8 +130,7 @@ const pool = new pg.Pool({
   port: process.env.DB_PORT,
 });
 
-app.use(express.static("public"));
-app.use(bodyParser.urlencoded({ extended: true }));
+
 
 // Helper function to format dates
 const formatDate = (date) => {
@@ -345,13 +299,16 @@ app.post("/register", async (req, res) => {
         if (err) {
           console.error("Error hashing password:", err);
         } else {
-          // Save the user to Firestore
-          await addDoc(collection(db, "users"), {
+          // Add user to Firestore and Firestore generates unique uid
+          const docRef = await addDoc(collection(db, "users"), {
             email: email,
-            password: hash,  // Store the hashed password
-            role: "user",     // Default role, can be modified as needed
+            password: hash, // Store the hashed password
+            role: "user",   // Default role, can be modified as needed
             createdAt: new Date(),
           });
+
+          // Use the Firestore generated document ID as the uid
+          await updateDoc(docRef, { uid: docRef.id });
 
           res.render("login.ejs");
         }
@@ -362,6 +319,7 @@ app.post("/register", async (req, res) => {
     res.render("register.ejs", { errorMessage: "An error occurred. Please try again." });
   }
 });
+
 
 
 app.post("/login", passport.authenticate("local", {
@@ -412,7 +370,7 @@ passport.use("local",
   })
 );
 
-passport.use("google", new GoogleStrategy({
+passport.use("google", new GoogleStrategy({ // google strategy also have to have uid to sequalize the user
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: "https://your-app-url.com/auth/google/callback",

@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+
 const firebaseConfig = {
   apiKey: "AIzaSyBr3CuAMcXz2OPveIVygpaW5GFQmO_9218",
   authDomain: "booking-system-fdbc1.firebaseapp.com",
