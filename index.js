@@ -42,11 +42,31 @@ env.config();
 app.use(express.static("public"));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
+    },
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+app.use(flash());
+
+app.use((req, res, next) => {
+  res.locals.errorMessage = req.flash("error"); // Pass error messages to views
+  next();
+});
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///Admin Panel Related Code
 
 
-
+//Admin Rooom Management Backend Routes
 app.get("/dashboard", (req, res) => {
   const currentDate = moment().format('DD/MM/YYYY'); // Format date using moment
   res.render("dashboard.ejs", { currentDate });
@@ -83,14 +103,19 @@ app.get("/room", async (req, res) => {
 app.post('/update-room/:roomId', async (req, res) => {
   const { roomId } = req.params; // Get roomId from the URL parameter
   const { roomName, capacity, facilities, availability } = req.body;
+  console.log(availability);
 
   try {
+    // Convert availability to boolean
+    const isAvailable = availability === "true" ? true : false;
+    const numericCapacity = Number(capacity);
+
     const roomRef = doc(db, "meeting_rooms", roomId);
     await updateDoc(roomRef, {
       name: roomName,
-      capacity: capacity,
-      facilities: facilities,
-      available: availability,
+      capacity: numericCapacity,
+      facilities: facilities || "Nil",
+      available: isAvailable, // Store boolean value
     });
 
     res.redirect("/room");
@@ -100,6 +125,207 @@ app.post('/update-room/:roomId', async (req, res) => {
   }
 });
 
+// Delete room by ID
+
+app.delete("/rooms/:id", async (req, res) => {
+  const roomId = req.params.id;
+  console.log("Server received room ID:", roomId);  // Log roomId for debugging
+  try {
+    // Access the "meeting_rooms" collection and delete the document
+    const roomRef = doc(db, "meeting_rooms", roomId);
+    const roomDoc = await getDoc(roomRef);  // Renamed doc to roomDoc to avoid conflict
+
+    if (!roomDoc.exists()) {
+      // Handle case where the document doesn't exist
+      console.log(`Room with ID ${roomId} not found.`);
+      return res.status(404).json({ error: "Room not found" });
+    }
+
+    // Delete the document
+    await deleteDoc(roomRef);  // Use deleteDoc() instead of .delete()
+    console.log(`Room with ID ${roomId} deleted successfully.`);
+
+    res.status(200).json({ message: "Room deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting room:", error);
+    res.status(500).json({ error: "Failed to delete the room" });
+  }
+});
+
+app.post("/create-room", async (req, res) => {
+  const { roomName, capacity, facilities, availability } = req.body;
+
+  try {
+    // Convert availability to boolean
+    const isAvailable = availability === "true" ? true : false;
+    const numericCapacity = Number(capacity);
+
+    // Add the new room to the Firestore collection
+    const newRoom = {
+      name: roomName,
+      capacity: numericCapacity,
+      facilities: facilities || "Nil", // Default to "None" if no facilities provided
+      available: isAvailable,
+    };
+
+    // Get a reference to the 'meeting_rooms' collection and add the new document
+    await addDoc(collection(db, "meeting_rooms"), newRoom);
+
+    // Redirect to the room management page after successfully creating the room
+    res.redirect("/room");
+  } catch (error) {
+    console.error("Error creating new room:", error);
+    res.status(500).send("Error creating room");
+  }
+});
+
+app.delete('/rooms', async (req, res) => {
+  try {
+    const { roomIds } = req.body; // Expecting an array of room IDs
+
+    if (!roomIds || roomIds.length === 0) {
+      return res.status(400).json({ error: 'No room IDs provided for deletion.' });
+    }
+
+    // Delete rooms from the database
+    await Room.deleteMany({ _id: { $in: roomIds } });
+
+    return res.status(200).json({ message: 'Rooms deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting rooms:', error);
+    res.status(500).json({ error: 'An error occurred while deleting rooms.' });
+  }
+});
+
+///////User Management Routes
+app.get("/users", async (req, res) => {
+  try {
+    const usersCollectionRef = collection(db, "users");
+    const snapshot = await getDocs(usersCollectionRef);
+
+    if (snapshot.empty) {
+      return res.status(404).send("No users found");
+    }
+
+    // Filter out users with role 'superadmin'
+    const users = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+      .filter(user => user.role !== 'superadmin'); // Exclude 'superadmin' role
+
+    res.render("users.ejs", { users });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error retrieving users data.");
+  }
+});
+
+app.post("/update-user/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const { email, role } = req.body;
+
+  try {
+    const userRef = doc(db, "users", userId);
+
+    // Check if any other user has the same email
+    const usersQuery = query(
+      collection(db, "users"),
+      where("email", "==", email)
+    );
+    const querySnapshot = await getDocs(usersQuery);
+
+    let emailExists = false;
+    querySnapshot.forEach((doc) => {
+      // Ensure the matching email is not from the same user being updated
+      if (doc.id !== userId) {
+        emailExists = true;
+      }
+    });
+
+    if (emailExists) {
+      req.flash("error", "Email already exists. Please use a different email.");
+      return res.redirect("/users");
+    }
+
+    // Update the user document
+    await updateDoc(userRef, {
+      email: email,
+      role: role,
+    });
+
+    res.redirect("/users");
+  } catch (error) {
+    console.error("Error updating user:", error);
+    req.flash("error", "An error occurred while updating the user.");
+    res.redirect("/users");
+  }
+});
+
+app.delete("/users/:id", async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      console.log(`User with ID ${userId} not found.`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await deleteDoc(userRef);
+    console.log(`User with ID ${userId} deleted successfully.`);
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ error: "Failed to delete the user" });
+  }
+});
+
+app.delete("/users", async (req, res) => {
+  try {
+    const { userIds } = req.body;
+
+    if (!userIds || userIds.length === 0) {
+      return res.status(400).json({ error: "No user IDs provided for deletion." });
+    }
+
+    const batch = writeBatch(db);
+    userIds.forEach((id) => {
+      const userRef = doc(db, "users", id);
+      batch.delete(userRef);
+    });
+
+    await batch.commit();
+    res.status(200).json({ message: "Users deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting users:", error);
+    res.status(500).json({ error: "An error occurred while deleting users." });
+  }
+});
+
+app.post("/create-user", async (req, res) => {
+  const { userName, userEmail, userRole } = req.body;
+
+  try {
+    const newUser = {
+      name: userName,
+      email: userEmail,
+      role: userRole,
+    };
+
+    await addDoc(collection(db, "users"), newUser);
+    res.redirect("/users");
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).send("Error creating user");
+  }
+});
+
+
+
 
 
 
@@ -107,20 +333,7 @@ app.post('/update-room/:roomId', async (req, res) => {
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
-    },
-  })
-);
 
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(flash());
 
 const pool = new pg.Pool({
   user: process.env.DB_USER,
@@ -286,6 +499,8 @@ app.get("/confirmation", async (req, res) => {
 app.post("/register", async (req, res) => {
   const email = req.body.username;
   const password = req.body.password;
+  const fromAdmin = req.body.fromAdmin || false;  // Check if this was an admin action
+  const role = req.body.role || "user";
 
   try {
     // Check if the email already exists in Firestore
@@ -303,14 +518,20 @@ app.post("/register", async (req, res) => {
           const docRef = await addDoc(collection(db, "users"), {
             email: email,
             password: hash, // Store the hashed password
-            role: "user",   // Default role, can be modified as needed
+            role: role,   // Default role, can be modified as needed
             createdAt: new Date(),
           });
 
           // Use the Firestore generated document ID as the uid
           await updateDoc(docRef, { uid: docRef.id });
 
-          res.render("login.ejs");
+          if (fromAdmin) {
+            // If it's from the admin panel, redirect to the users page or another admin page
+            res.redirect("/users");  // Change this to your desired redirect URL
+          } else {
+            // Redirect to the login page if it's a normal user registration
+            res.render("login.ejs");
+          }
         }
       });
     }
@@ -930,6 +1151,31 @@ app.get('/delete-confirmation', (req, res) => {
   res.render('delete-confirmation.ejs');
 });
 
+// Route to handle form submission
+app.post("/submit-feedback", async (req, res) => {
+  const { name, contactNumber, email, description } = req.body;
+
+  try {
+    // Add data to the Firestore 'feedback' collection
+    const feedbackRef = await addDoc(collection(db, "feedback"), {
+      name: name || "Anonymous",
+      contactNumber: contactNumber || "No Contact Number",
+      email: email || "No Email" ,
+      description: description,
+      status: "pending", // You can modify this according to your needs
+    });
+
+    // After successfully adding to Firestore, you can redirect or send a success message
+    res.redirect("/thank-you"); // Redirect to a thank you page or show a success message
+  } catch (error) {
+    console.error("Error adding document: ", error);
+    res.status(500).send("Error submitting feedback. Please try again.");
+  }
+});
+
+app.get("/thank-you", (req, res) => {
+  res.render("thankYou.ejs");
+});
 
 passport.serializeUser((user, cb) => {
   cb(null, user.uid); // Serialize user_id to session
@@ -956,4 +1202,10 @@ app.listen(port, () => {
 });
 
 
-//added a comment for github activeness
+
+
+
+
+
+
+

@@ -1213,40 +1213,52 @@ if (isToday) {
 
 ///Admin Penel Related JS
  // Toggle all checkboxes
+ // Select all checkboxes logic
  function toggleAll() {
-	const bulkSelectAll = document.getElementById("bulk-select-all");
-	const checkboxes = document.querySelectorAll(".bulk-select-checkbox");
-	checkboxes.forEach((checkbox) => {
-	  checkbox.checked = bulkSelectAll.checked;
-	});
-	toggleDeleteButton();
+    const bulkSelectAll = document.getElementById("bulk-select-all");
+    const checkboxes = document.querySelectorAll(".bulk-select-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = bulkSelectAll.checked;
+    });
+    toggleDeleteButton();
   }
 
-  // Show or hide the delete button depending on selected checkboxes
+  // Toggle delete button visibility
   function toggleDeleteButton() {
-	const selectedItems = document.querySelectorAll('.bulk-select-checkbox:checked');
-	const deleteButton = document.getElementById('deleteButton');
-	deleteButton.style.display = selectedItems.length > 0 ? 'inline-block' : 'none';
+    const checkboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+    const deleteButton = document.getElementById("deleteButton");
+    deleteButton.style.display = checkboxes.length > 0 ? "inline-block" : "none";
   }
 
-  // Delete selected rooms
-  function deleteSelected() {
-	const selectedRows = document.querySelectorAll('.bulk-select-checkbox:checked');
-	selectedRows.forEach((checkbox) => {
-	  const row = checkbox.closest('tr');
-	  row.remove();
-	});
-	toggleDeleteButton();
+  // Bulk delete logic
+  async function deleteSelected() {
+    const selectedCheckboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+    const roomIds = Array.from(selectedCheckboxes).map((checkbox) => checkbox.value);
+
+    if (roomIds.length === 0) {
+      alert("No rooms selected for deletion.");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${roomIds.length} rooms?`)) {
+      return;
+    }
+
+    try {
+      // Send a DELETE request for each selected room
+      for (const roomId of roomIds) {
+        await fetch(`/rooms/${roomId}`, { method: "DELETE" });
+      }
+
+      // Reload the page to reflect changes
+      alert("Selected rooms deleted successfully!");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error deleting rooms:", error);
+      alert("An error occurred while deleting the rooms.");
+    }
   }
-
-  // Delete individual row
-  function deleteRow(button) {
-	const row = button.closest('tr');
-	row.remove();
-  }
-
-
-  ///Edit Room Form related Java Script
+ 
   // Show the edit form with the room's data populated
   function showEditForm(roomId) {
 	// Find the row with the matching room ID
@@ -1267,8 +1279,6 @@ if (isToday) {
 	  console.error("Room row not found!");
 	}
   }
-  
-  
   
   // Close the edit form
   function closeEditForm() {
@@ -1300,11 +1310,168 @@ if (isToday) {
     }
 }
 
+function deleteRoom(roomId) {
+	// Confirm the deletion action with the user
+	const confirmation = confirm("Are you sure you want to delete this room?");
+	if (!confirmation) {
+	  return;
+	}
+  
+	// Make an HTTP DELETE request to the server
+	fetch(`/rooms/${roomId}`, {
+	  method: "DELETE",
+	})
+	  .then((response) => {
+		if (!response.ok) {
+		  throw new Error("Failed to delete the room.");
+		}
+		return response.json();
+	  })
+	  .then((data) => {
+		// Remove the room row from the table in the DOM
+		const roomRow = document.querySelector(`[data-room-id="${roomId}"]`);
+		if (roomRow) roomRow.remove();  // Ensure roomRow exists before removing it
+  
+		alert("Room deleted successfully!");
+	  })
+	  .catch((error) => {
+		console.error(error);
+		alert("An error occurred while trying to delete the room.");
+	  });
+  }
+  
+// Show the Create Room Form
+function showCreateForm() {
+	document.getElementById("createFormContainer").classList.remove("hidden");
+  }
+  
+  // Close the Create Room Form
+  function closeCreateForm() {
+	document.getElementById("createFormContainer").classList.add("hidden");
+  }
+  
+  // Bind the create button to show the create form
+  document.querySelector(".bg-blue-500").addEventListener("click", showCreateForm);
+	
   
 
   
   
+///////////////////User Management Code
 
+// Toggle all user checkboxes
+function toggleAllUsers() {
+	const bulkSelectAll = document.getElementById("bulk-select-all");
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox");
+	checkboxes.forEach((checkbox) => {
+	  checkbox.checked = bulkSelectAll.checked;
+	});
+	toggleDeleteUserButton();
+  }
+  
+  // Toggle delete button visibility
+  function toggleDeleteUserButton() {
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+	const deleteButton = document.getElementById("deleteButton");
+	deleteButton.style.display = checkboxes.length > 0 ? "inline-block" : "none";
+  }
+  
+  // Bulk delete users
+  async function deleteSelectedUsers() {
+	const selectedCheckboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+	const userIds = Array.from(selectedCheckboxes).map((checkbox) => checkbox.value);
+  
+	if (userIds.length === 0) {
+	  alert("No users selected for deletion.");
+	  return;
+	}
+  
+	if (!confirm(`Are you sure you want to delete ${userIds.length} users?`)) {
+	  return;
+	}
+  
+	try {
+	  for (const userId of userIds) {
+		await fetch(`/users/${userId}`, { method: "DELETE" });
+	  }
+  
+	  alert("Selected users deleted successfully!");
+	  window.location.reload();
+	} catch (error) {
+	  console.error("Error deleting users:", error);
+	  alert("An error occurred while deleting the users.");
+	}
+  }
+  
+  //individual delete
+  function deleteUser(userId) {
+	// Confirm the deletion action with the user
+	const confirmation = confirm("Are you sure you want to delete this user?");
+	if (!confirmation) {
+	  return;
+	}
+  
+	// Make an HTTP DELETE request to the server
+	fetch(`/users/${userId}`, {
+	  method: "DELETE",
+	})
+	  .then((response) => {
+		if (!response.ok) {
+		  throw new Error("Failed to delete the user.");
+		}
+		return response.json();
+	  })
+	  .then((data) => {
+		// Remove the user row from the table in the DOM
+		const userRow = document.querySelector(`[data-user-id="${userId}"]`);
+		if (userRow) userRow.remove();  // Ensure userRow exists before removing it
+  
+		alert("User deleted successfully!");
+	  })
+	  .catch((error) => {
+		console.error(error);
+		alert("An error occurred while trying to delete the user.");
+	  });
+  }
+  
+  // Show the edit form with user data populated
+  function showEditUserForm(userId) {
+	const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+  
+	if (row) {
+	document.getElementById("editUserId").value = userId;
+	//   document.getElementById("editUserName").value = row.querySelector(".user-name").innerText;
+	document.getElementById("editUserEmail").value = row.querySelector(".user-email").innerText;
+	document.getElementById("editUserRole").value = row.querySelector(".user-role").innerText;
+
+	  const form = document.getElementById("editUserForm");
+	  form.action = `/update-user/${userId}`;
+	  document.getElementById("editFormContainer").classList.remove("hidden");
+	} else {
+	  console.error("User row not found!");
+	}
+  }
+  
+  // Close the edit form
+  function closeEditUserForm() {
+	document.getElementById("editFormContainer").classList.add("hidden");
+  }
+  
+  // Show the Create User Form
+  function showCreateUserForm() {
+	document.getElementById("createFormContainer").classList.remove("hidden");
+  }
+  
+  // Close the Create User Form
+  function closeCreateUserForm() {
+	document.getElementById("createFormContainer").classList.add("hidden");
+  }
+  
+  // Bind the create button to show the create form
+  document.querySelector(".bg-blue-500").addEventListener("click", showCreateForm);
+  
+
+  
 
 
 

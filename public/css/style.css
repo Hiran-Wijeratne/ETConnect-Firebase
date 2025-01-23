@@ -231,6 +231,7 @@ input[type="submit"].read_bt_submit_button:disabled:hover {
     margin-bottom: 15px;
     text-align: center;
 }
+  
 
 
 
@@ -1541,7 +1542,7 @@ textarea#comment.massage-bt::placeholder {
     float: left;
 }
 
-.send_bt a {
+.send_bt button {
     width: 100%;
     text-align: center;
     font-size: 18px;
@@ -1554,7 +1555,7 @@ textarea#comment.massage-bt::placeholder {
     font-weight: bold;
 }
 
-.send_bt a:hover {
+.send_bt button:hover {
     color: #ffffff;
     background-color: #252525;
 }

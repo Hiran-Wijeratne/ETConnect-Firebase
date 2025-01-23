@@ -1,0 +1,227 @@
+<%- include("partials/sidebar.ejs") %>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+      <header class="bg-white shadow p-4 flex justify-between items-center">
+        <h1 class="text-xl font-bold">Welcome, Admin!</h1>
+        <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Logout</button>
+      </header>
+
+      <main class="p-6 flex flex-col gap-6">
+        <!-- Users Table -->
+        <section class="bg-white p-6 rounded-lg shadow">
+          <h2 class="text-lg font-bold">User Management</h2>
+          <!-- Display Flash Message -->
+          <div class="mt-5"></div>
+<% if (locals.errorMessage && locals.errorMessage.length > 0) { %>
+    <div class="mt-5"></div>
+    <div
+    class="error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+    role="alert"
+  >
+        <span class="block sm:inline"><%= errorMessage %></span>
+    </div>
+    <div class="mt-5"></div>
+  <% } %>
+          <div class="overflow-x-auto">
+            <table class="table-auto w-full mt-4 border-collapse border border-gray-300">
+                <thead>
+                  <tr class="bg-gray-200">
+                    <th class="border border-gray-300 px-4 py-2">
+                      <input
+                        type="checkbox"
+                        id="bulk-select-all"
+                        onclick="toggleAllUsers()"
+                      />
+                    </th>
+                    <th class="border border-gray-300 px-4 py-2">Email/Username</th>
+                    <th class="border border-gray-300 px-4 py-2">Role</th>
+                    <th class="border border-gray-300 px-4 py-2">Created At</th>
+                    <th class="border border-gray-300 px-4 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="bulk-select-body">
+                  <% users.forEach((user) => { %>
+                  <tr data-user-id="<%= user.id %>">
+                    <td class="border border-gray-300 px-4 py-2">
+                      <input
+                        type="checkbox"
+                        class="bulk-select-checkbox"
+                        value="<%= user.id %>"
+                        onclick="toggleDeleteUserButton()"
+                      />
+                    </td>
+                    <td class="border border-gray-300 px-4 py-2 user-email"><%= user.email %></td>
+                    <td class="border border-gray-300 px-4 py-2 user-role"><%= user.role %></td>
+                    <td class="border border-gray-300 px-4 py-2 user-created-at">
+                      <%= new Date(user.createdAt.seconds * 1000).toLocaleString() %>
+                    </td>
+                    <td class="border border-gray-300 px-4 py-2 flex space-x-2">
+                      <button
+                        class="bg-yellow-500 text-white px-4 py-1 rounded hover:bg-yellow-600"
+                        onclick="showEditUserForm('<%= user.id %>')"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        class="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600"
+                        onclick="deleteUser('<%= user.id %>')"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+              
+            
+            
+            
+            
+            
+          </div>
+
+          <!-- Bulk Actions -->
+          <div class="mt-4 flex justify-end space-x-4">
+            <button
+              id="deleteButton"
+              onclick="deleteSelectedUsers()"
+              class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+              style="display: none"
+            >
+              Delete Selected
+            </button>
+            <button
+    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+    onclick="showCreateUserForm()"
+  >
+    Create
+  </button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+
+  <!-- Edit Form (Initially hidden) -->
+<div id="editFormContainer" class="hidden fixed inset-0 bg-gray-500 bg-opacity-50 flex justify-center items-center">
+    <div class="bg-white p-6 rounded-lg w-96">
+      <h3 class="text-lg font-bold mb-4">Edit User</h3>
+      <!-- Hidden input to pass userId -->
+      <form id="editUserForm" method="POST">
+        <input type="hidden" id="editUserId" name="userId" value="userIdHere" />
+  
+        <div class="mb-4">
+          <label for="editUserEmail" class="block text-sm font-medium">Email/Username</label>
+          <input
+            type="text"
+            id="editUserEmail"
+            name="email"
+            class="w-full px-3 py-2 border border-gray-300 rounded"
+            required
+          />
+        </div>
+  
+        <div class="mb-4">
+          <label for="editUserRole" class="block text-sm font-medium">Role</label>
+          <select
+            id="editUserRole"
+            name="role"
+            class="w-full px-3 py-2 border border-gray-300 rounded"
+          >
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
+          </select>
+        </div>
+  
+        <div class="flex justify-between">
+          <button
+            type="button"
+            onclick="closeEditUserForm()"
+            class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+
+  <!-- Create Form (Initially hidden) -->
+<div id="createFormContainer" class="hidden fixed inset-0 bg-gray-500 bg-opacity-50 flex justify-center items-center">
+    <div class="bg-white p-6 rounded-lg w-96">
+      <h3 class="text-lg font-bold mb-4">Create User</h3>
+  
+      <form action="/register" method="POST" class="bg-white p-6 rounded-lg shadow mt-4">
+        <div class="mb-4">
+          <label for="createUserEmail" class="block text-sm font-medium">Email/Username</label>
+          <input
+            type="text"
+            id="createUserEmail"
+            name="username"
+            class="w-full px-3 py-2 border border-gray-300 rounded"
+            required
+          />
+        </div>
+  
+        <div class="mb-4">
+          <label for="createUserPassword" class="block text-sm font-medium">Password</label>
+          <input
+            type="password"
+            id="createUserPassword"
+            name="password"
+            class="w-full px-3 py-2 border border-gray-300 rounded"
+            required
+          />
+        </div>
+  
+        <div class="mb-4">
+          <label for="createUserRole" class="block text-sm font-medium">Role</label>
+          <select
+            id="createUserRole"
+            name="role"
+            class="w-full px-3 py-2 border border-gray-300 rounded"
+          >
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <!-- Hidden field to indicate the user is being created by the admin -->
+      <input type="hidden" name="fromAdmin" value="true" />
+  
+        <div class="flex justify-between">
+          <button
+            type="button"
+            onclick="closeCreateUserForm()"
+            class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Create User
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+
+
+ 
+<script src="/js/custom.js"></script>
+
+</body>
+</html>
