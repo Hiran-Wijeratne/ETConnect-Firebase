@@ -247,7 +247,10 @@
       console.log("Room Data:", roomData);  // Log the room data for each document
       const option = document.createElement('option');
       option.value = doc.id;
-      option.text = roomData.name || "No Name";
+      const capacityText = roomData.capacity ? ` (Capacity ${roomData.capacity})` : ""; // Add capacity if available
+option.text = `${roomData.name || "No Name"}${capacityText}`; // Display name and capacity in the dropdown
+
+
 
       roomSelect.appendChild(option);
 

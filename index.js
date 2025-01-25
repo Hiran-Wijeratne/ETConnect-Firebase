@@ -9,6 +9,8 @@ import env from "dotenv";
 import moment from "moment";
 import flash from "connect-flash";
 import GoogleStrategy from "passport-google-oauth2";
+import nodemailer from 'nodemailer';
+import emailValidator from 'email-validator'; // Ensure to install email-validator
 // Firebase Related Import
 import {db} from "./public/config/firebase-config.js";
 import {
@@ -21,7 +23,8 @@ import {
   orderBy,
   updateDoc,
   deleteDoc,
-  getDoc
+  getDoc,
+  writeBatch
 } from "firebase/firestore";
 
 
@@ -62,6 +65,21 @@ app.use((req, res, next) => {
   next();
 });
 
+
+// Set up Nodemailer transporter using SMTP
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com', // The SMTP host for your email provider
+  port: 587, // SMTP port (587 is usually for TLS, 465 for SSL, 25 is a non-secure option)
+  secure: false, // Set to true if using SSL
+  auth: {
+    user: 'tp.bookingapp@gmail.com', // Your email address
+    pass: 'jyec lqrq aukz xrxc',   // Your email password or app-specific password
+  },
+  tls: {
+    rejectUnauthorized: false,  // This is to prevent errors in some cases (optional)
+  }
+});
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///Admin Panel Related Code
 
@@ -71,7 +89,6 @@ app.get("/dashboard", (req, res) => {
   const currentDate = moment().format('DD/MM/YYYY'); // Format date using moment
   res.render("dashboard.ejs", { currentDate });
 });
-
 
 app.get("/room", async (req, res) => {
   try {
@@ -125,33 +142,6 @@ app.post('/update-room/:roomId', async (req, res) => {
   }
 });
 
-// Delete room by ID
-
-app.delete("/rooms/:id", async (req, res) => {
-  const roomId = req.params.id;
-  console.log("Server received room ID:", roomId);  // Log roomId for debugging
-  try {
-    // Access the "meeting_rooms" collection and delete the document
-    const roomRef = doc(db, "meeting_rooms", roomId);
-    const roomDoc = await getDoc(roomRef);  // Renamed doc to roomDoc to avoid conflict
-
-    if (!roomDoc.exists()) {
-      // Handle case where the document doesn't exist
-      console.log(`Room with ID ${roomId} not found.`);
-      return res.status(404).json({ error: "Room not found" });
-    }
-
-    // Delete the document
-    await deleteDoc(roomRef);  // Use deleteDoc() instead of .delete()
-    console.log(`Room with ID ${roomId} deleted successfully.`);
-
-    res.status(200).json({ message: "Room deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting room:", error);
-    res.status(500).json({ error: "Failed to delete the room" });
-  }
-});
-
 app.post("/create-room", async (req, res) => {
   const { roomName, capacity, facilities, availability } = req.body;
 
@@ -179,23 +169,89 @@ app.post("/create-room", async (req, res) => {
   }
 });
 
-app.delete('/rooms', async (req, res) => {
-  try {
-    const { roomIds } = req.body; // Expecting an array of room IDs
+app.delete("/rooms/:id", async (req, res) => {
+  const roomId = req.params.id;
+  console.log("Server received room ID for deletion:", roomId); // Debugging log
 
-    if (!roomIds || roomIds.length === 0) {
-      return res.status(400).json({ error: 'No room IDs provided for deletion.' });
+  try {
+    // Reference to the room document
+    const roomRef = doc(db, "meeting_rooms", roomId);
+    const roomDoc = await getDoc(roomRef);
+
+    if (!roomDoc.exists()) {
+      console.log(`Room with ID ${roomId} not found.`);
+      return res.status(404).json({ error: "Room not found" });
     }
 
-    // Delete rooms from the database
-    await Room.deleteMany({ _id: { $in: roomIds } });
+    // Query to find all bookings associated with the room
+    const bookingsRef = collection(db, "bookings");
+    const bookingsQuery = query(bookingsRef, where("room_id", "==", roomId));
+    const bookingsSnapshot = await getDocs(bookingsQuery);
 
-    return res.status(200).json({ message: 'Rooms deleted successfully.' });
+    // Start a batch operation for cascade delete
+    const batch = writeBatch(db);
+
+    // Add deletion of associated bookings to the batch
+    bookingsSnapshot.forEach((booking) => {
+      const bookingRef = doc(db, "bookings", booking.id);
+      batch.delete(bookingRef);
+    });
+
+    // Add deletion of the room to the batch
+    batch.delete(roomRef);
+
+    // Commit the batch operation
+    await batch.commit();
+
+    console.log(`Room with ID ${roomId} and its associated bookings deleted successfully.`);
+    res.status(200).json({ message: "Room and associated bookings deleted successfully." });
   } catch (error) {
-    console.error('Error deleting rooms:', error);
-    res.status(500).json({ error: 'An error occurred while deleting rooms.' });
+    console.error("Error during cascade delete:", error);
+    res.status(500).json({ error: "Failed to delete the room and associated bookings" });
   }
 });
+
+app.delete("/rooms", async (req, res) => {
+  const { roomIds } = req.body; // Expecting an array of room IDs
+
+  if (!roomIds || roomIds.length === 0) {
+    return res.status(400).json({ error: "No room IDs provided for deletion." });
+  }
+
+  try {
+    // Start a batch operation
+    const batch = writeBatch(db);
+
+    for (const roomId of roomIds) {
+      // Reference to the room document
+      const roomRef = doc(db, "meeting_rooms", roomId);
+
+      // Query to find all bookings associated with the room
+      const bookingsRef = collection(db, "bookings");
+      const bookingsQuery = query(bookingsRef, where("room_id", "==", roomId));
+      const bookingsSnapshot = await getDocs(bookingsQuery);
+
+      // Add deletion of associated bookings to the batch
+      bookingsSnapshot.forEach((booking) => {
+        const bookingRef = doc(db, "bookings", booking.id);
+        batch.delete(bookingRef);
+      });
+
+      // Add deletion of the room to the batch
+      batch.delete(roomRef);
+    }
+
+    // Commit the batch operation
+    await batch.commit();
+
+    console.log("Rooms and their associated bookings deleted successfully.");
+    res.status(200).json({ message: "Rooms and associated bookings deleted successfully." });
+  } catch (error) {
+    console.error("Error during cascade delete:", error);
+    res.status(500).json({ error: "Failed to delete rooms and their associated bookings" });
+  }
+});
+
 
 ///////User Management Routes
 app.get("/users", async (req, res) => {
@@ -325,8 +381,88 @@ app.post("/create-user", async (req, res) => {
 });
 
 
+///////FeedBack Management Routes
 
+app.get("/feedback", async (req, res) => {
+  try {
+    const feedbackCollection = collection(db, "feedback");
+    const feedbackSnapshot = await getDocs(feedbackCollection);
 
+    const feedbackPending = [];
+    const feedbackSolved = [];
+    feedbackSnapshot.forEach((doc) => {
+      const feedback = { id: doc.id, ...doc.data() };
+      if (feedback.status === "pending") feedbackPending.push(feedback);
+      else feedbackSolved.push(feedback);
+    });
+
+    res.render("feedback.ejs", { feedbackPending, feedbackSolved });
+  } catch (error) {
+    res.status(500).send("Error fetching feedback: " + error.message);
+  }
+});
+
+// Add new feedback
+app.post("/add-feedback", async (req, res) => {
+  try {
+    const { name, email, description } = req.body;
+    const newFeedbackRef = doc(collection(db, "feedback"));
+    await setDoc(newFeedbackRef, {
+      name,
+      email,
+      description,
+      status: "pending",
+    });
+    res.redirect("/");
+  } catch (error) {
+    res.status(500).send("Error adding feedback: " + error.message);
+  }
+});
+
+// Update feedback
+app.post("/update-feedback", async (req, res) => {
+  try {
+    const { id, description, status } = req.body;
+    const feedbackRef = doc(db, "feedback", id);
+    await updateDoc(feedbackRef, { description, status });
+    res.redirect("/feedback");
+  } catch (error) {
+    res.status(500).send("Error updating feedback: " + error.message);
+  }
+});
+
+// Delete feedback
+app.post("/delete-feedback", async (req, res) => {
+  try {
+    const { id } = req.body;
+    const feedbackRef = doc(db, "feedback", id);
+    await deleteDoc(feedbackRef);
+    res.redirect("/feedback");
+  } catch (error) {
+    res.status(500).send("Error deleting feedback: " + error.message);
+  }
+});
+
+// Bulk delete feedback
+app.post("/delete-selected-feedback", async (req, res) => {
+  try {
+    // Split the comma-separated string into an array
+    const selectedFeedbackIds = (req.body.selectedFeedbackIds || "").split(",");
+
+    // Validate the input: ensure all IDs are non-empty
+    const validIds = selectedFeedbackIds.filter(id => id.trim() !== "");
+
+    for (const id of validIds) {
+      const feedbackRef = doc(db, "feedback", id);
+      await deleteDoc(feedbackRef);
+    }
+
+    res.redirect("/feedback");
+  } catch (error) {
+    console.error("Error deleting selected feedback:", error);
+    res.status(500).send("Error deleting selected feedback: " + error.message);
+  }
+});
 
 
 
@@ -664,19 +800,21 @@ app.get("/bookinglist", async (req, res) => {
         }
 
         return {
-          booking_id: doc.id,
+          booking_id: doc.id.substring(0, 2) + '...',
           username: data.email || 'Unknown', // Default value if 'name' is missing
           date: bookingDate.format("DD-MM-YYYY"),
           start_time: data.starttime || 'N/A',
           end_time: data.endtime || 'N/A',
           description: data.des || data.description || 'No description',
-          room: data.room_name ? data.room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
-          booking_date: data.created_at ? 
-  (data.created_at.toDate ? moment(data.created_at.toDate()).format("YYYY-MM-DD") : moment(data.created_at).format("YYYY-MM-DD")) 
-  : 'N/A',
-
+          room: data.room_name ? data.room_name.replace(/\s*\(.*?\)\s*/g, '').trim() : 'N/A',
+          booking_date: data.created_at
+            ? (data.created_at.toDate
+                ? moment(data.created_at.toDate()).format("YYYY-MM-DD")
+                : moment(data.created_at).format("YYYY-MM-DD"))
+            : 'N/A',
           status: status // Add status field to track whether booking is past or upcoming
         };
+        
       });
     };
 
@@ -695,7 +833,6 @@ app.get("/bookinglist", async (req, res) => {
     res.status(500).send("Error retrieving bookings.");
   }
 });
-
 
 app.get("/mybookings", async (req, res) => {
   if (req.isAuthenticated()) {
@@ -720,13 +857,13 @@ app.get("/mybookings", async (req, res) => {
         const bookingEndTime = moment(`${data.date} ${data.endtime}`, "YYYY-MM-DD HH:mm:ss");
 
         return {
-          booking_id: doc.id,
+          booking_id: doc.id.substring(0, 2) + '...',
           username: data.email || "Unknown", // Default to 'Unknown' if 'email' is missing
           date: moment(data.date).format("DD-MM-YYYY"),
           start_time: moment(data.starttime, "HH:mm:ss").format("HH:mm")|| "Invalid", // Format start time to HH:mm
           end_time: moment(data.endtime, "HH:mm:ss").format("HH:mm") || "Invalid", // Format end time to HH:mm
           description: data.des || data.description || "No description",
-          room: data.room_name ? data.room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
+          room: data.room_name ? data.room_name.replace(/\s*\(.*?\)\s*/g, '').trim() : 'N/A',
           booking_date: data.created_at ? 
   (data.created_at.toDate ? moment(data.created_at.toDate()).format("YYYY-MM-DD") : moment(data.created_at).format("YYYY-MM-DD")) 
   : 'N/A',
@@ -802,7 +939,6 @@ app.get('/edit-booking/:id', async (req, res) => {
     res.redirect("/login");
   }
 });
-
 
 app.post('/edit', async (req, res) => {
   console.log("Form data received:", req.body);
@@ -890,7 +1026,6 @@ app.post('/edit', async (req, res) => {
   }
 });
 
-
 app.post('/next', async (req, res) => {
   const { room_id, date, purpose, start, end } = req.body;
 
@@ -973,7 +1108,6 @@ app.post('/next', async (req, res) => {
   }
 });
 
-
 app.post('/submit', async (req, res) => {
   if (req.isAuthenticated()) {
     let { room_id, date, start, end, purpose } = req.body;
@@ -998,7 +1132,6 @@ app.post('/submit', async (req, res) => {
 
       // Step 2: Insert booking details into Firestore
       const bookingData = {
-        // user_id: req.user.uid, // Use the authenticated user's UID
         name: req.user.email || "Anonymous", // Add user's name if available
         email: req.user.email, // Add user's email
         date: formattedDate,
@@ -1013,7 +1146,29 @@ app.post('/submit', async (req, res) => {
       // Add the booking data to the "bookings" collection
       const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
 
-      // Step 3: Prepare data for the confirmation page
+      // Step 3: Validate the email format before sending
+      if (emailValidator.validate(req.user.email)) {
+        // Send the email without blocking the process if it fails
+        const mailOptions = {
+          from: 'your-email@domain.com', // sender address (must be the same as the SMTP user)
+          to: req.user.email,  // recipient address (user's email)
+          subject: 'Booking Confirmation', // email subject
+          text: `Hello ${req.user.email},\n\nYour booking has been confirmed.\n\nDetails:\nRoom: ${roomName || "Room 1"}\nDate: ${formattedDate}\nStart Time: ${start}\nEnd Time: ${end}\nPurpose: ${purpose}\n\nThank you for using our booking system.`, // email body
+        };
+
+        // Try sending the email in a non-blocking way
+        transporter.sendMail(mailOptions, (error, info) => {
+          if (error) {
+            console.error('Error sending email:', error);
+          } else {
+            console.log('Email sent:', info.response);
+          }
+        });
+      } else {
+        console.log('Invalid email format, not sending email.');
+      }
+
+      // Step 4: Prepare data for the confirmation page
       const queryParams = new URLSearchParams({
         id: bookingRef.id,
         date: formattedDate,
@@ -1035,9 +1190,6 @@ app.post('/submit', async (req, res) => {
     res.redirect('/login');
   }
 });
-
-
-
 
 app.get('/calendarPage', async (req, res) => {
   try {
@@ -1145,13 +1297,10 @@ app.get('/delete/:id', async (req, res) => {
   }
 });
 
-
-// Delete confirmation route
 app.get('/delete-confirmation', (req, res) => {
   res.render('delete-confirmation.ejs');
 });
 
-// Route to handle form submission
 app.post("/submit-feedback", async (req, res) => {
   const { name, contactNumber, email, description } = req.body;
 

@@ -1,0 +1,252 @@
+<%- include("partials/sidebar.ejs") %>
+
+<!-- Main Content -->
+<div class="flex-1 flex flex-col ml-64 max-w-full">
+  <header class="bg-white shadow p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">Welcome, Admin!</h1>
+    <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Logout</button>
+  </header>
+
+  <main class="p-6 flex flex-col gap-6  max-w-full">
+    <!-- Users Table -->
+    <section class="bg-white p-6 rounded-lg shadow">
+      <h2 class="text-lg font-bold">Pending Feedback</h2>
+      <!-- Display Flash Message -->
+      <div class="mt-5"></div>
+      
+      <div class="overflow-x-auto">
+        <table class="table-auto w-full mt-4 border-collapse border border-gray-300">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border border-gray-300 px-4 py-2">Name</th>
+              <th class="border border-gray-300 px-4 py-2">Email</th>
+              <th class="border border-gray-300 px-4 py-2">Description</th>
+              <th class="border border-gray-300 px-4 py-2">Status</th>
+              <th class="border border-gray-300 px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% feedbackPending.forEach((feedback) => { %>
+            <tr>
+              <td class="border border-gray-300 px-4 py-2"><%= feedback.name %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= feedback.email %></td>
+              <td class="border border-gray-300 px-4 py-2 break-words max-w-xs"><%= feedback.description %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= feedback.status %></td>
+              <td class="border border-gray-300 px-4 py-2">
+                <button
+                  class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  onclick="showEditForm('<%= feedback.id %>', '<%= feedback.description %>', '<%= feedback.status %>')"
+                >
+                  Edit
+                </button>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="flex justify-start">
+      <button
+        id="toggle-solved-feedback"
+        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mt-4"
+        onclick="toggleSolvedFeedback()"
+        style="width: auto;"
+      >
+        Toggle Solved Feedback
+      </button>
+    </section>
+    
+
+  
+
+
+   
+
+    <!-- Table for Solved Feedback -->
+    <section class="bg-white p-6 rounded-lg shadow hidden" id="solved-feedback-section">
+      <h2 class="text-lg font-bold">Solved Feedback</h2>
+      <div class="overflow-x-auto">
+        <table class=" table-auto w-full mt-4 border-collapse border border-gray-300">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border border-gray-300 px-4 py-2">
+                <input type="checkbox" id="bulk-select-all" onclick="toggleBulkSelectAll()" />
+              </th>
+              <th class="border border-gray-300 px-4 py-2">Name</th>
+              <th class="border border-gray-300 px-4 py-2">Email</th>
+              <th class="border border-gray-300 px-4 py-2 ">Description</th>
+              <th class="border border-gray-300 px-4 py-2">Status</th>
+              <th class="border border-gray-300 px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="bulk-select-body">
+            <% feedbackSolved.forEach((feedback) => { %>
+            <tr data-feedback-id="<%= feedback.id %>">
+              <td class="border border-gray-300 px-4 py-2">
+                <input type="checkbox" class="bulk-select-checkbox" />
+              </td>
+              <td class="border border-gray-300 px-4 py-2"><%= feedback.name %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= feedback.email %></td>
+              <td class="border border-gray-300 px-4 py-2 break-words max-w-xs"><%= feedback.description %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= feedback.status %></td>
+              <td class="border border-gray-300 px-4 py-2">
+                <button
+                  class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  onclick="showEditForm('<%= feedback.id %>', '<%= feedback.description %>', '<%= feedback.status %>')"
+                >
+                  Edit
+                </button>
+                <form action="/delete-feedback" method="POST" class="individual-delete-form"  style="display:inline-block;">
+                  <input type="hidden" name="id" value="<%= feedback.id %>" />
+                  <button
+                    type="submit"
+                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                  >
+                    Delete
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <!-- Bulk Actions -->
+      <div class="mt-4 flex justify-end space-x-4">
+        <form action="/delete-selected-feedback" method="POST" id="bulk-delete-form" style="display: none;">
+          <input type="hidden" name="selectedFeedbackIds" id="selectedFeedbackIds" />
+          <button
+            type="submit"
+            id="delete-selected"
+            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+          >
+            Delete Selected
+          </button>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Edit Form -->
+<div id="editFormContainer" class="hidden fixed inset-0 bg-gray-500 bg-opacity-50 flex justify-center items-center">
+  <div class="bg-white p-6 rounded-lg w-96">
+    <h3 class="text-lg font-bold mb-4">Edit Feedback</h3>
+    <form id="editFeedbackForm" method="POST" action="/update-feedback">
+      <input type="hidden" id="editFeedbackId" name="id" />
+      <div class="mb-4">
+        <label for="editFeedbackDescription" class="block text-sm font-medium">Description</label>
+        <textarea id="editFeedbackDescription" name="description" class="w-full px-3 py-2 border border-gray-300 rounded"></textarea>
+      </div>
+      <div class="mb-4">
+        <label for="editFeedbackStatus" class="block text-sm font-medium">Status</label>
+        <select id="editFeedbackStatus" name="status" class="w-full px-3 py-2 border border-gray-300 rounded">
+          <option value="pending">Pending</option>
+          <option value="solved">Solved</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-4">
+        <button type="button" onclick="closeEditForm()" class="bg-gray-400 text-white px-4 py-2 rounded">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Function to toggle all checkboxes for bulk select
+function toggleBulkSelectAll() {
+  const checkboxes = document.querySelectorAll('.bulk-select-checkbox');
+  const isChecked = document.getElementById('bulk-select-all').checked;
+  checkboxes.forEach(checkbox => checkbox.checked = isChecked);
+  updateBulkDeleteForm();
+}
+
+// Function to handle individual checkbox selection
+document.querySelectorAll('.bulk-select-checkbox').forEach(checkbox => {
+  checkbox.addEventListener('change', () => {
+    updateBulkDeleteForm();
+  });
+});
+
+function updateBulkDeleteForm() {
+  const selectedIds = [];
+  document.querySelectorAll('.bulk-select-checkbox:checked').forEach(checkbox => {
+    const row = checkbox.closest('tr');
+    selectedIds.push(row.dataset.feedbackId);
+  });
+
+  if (selectedIds.length > 0) {
+    document.getElementById('selectedFeedbackIds').value = selectedIds.join(',');
+    document.getElementById('bulk-delete-form').style.display = 'block';
+  } else {
+    document.getElementById('bulk-delete-form').style.display = 'none';
+  }
+}
+
+// Function to show the edit form
+function showEditForm(id, description, status) {
+  document.getElementById('editFeedbackId').value = id;
+  document.getElementById('editFeedbackDescription').value = description;
+  document.getElementById('editFeedbackStatus').value = status;
+  document.getElementById('editFormContainer').style.display = 'flex';
+}
+
+// Function to close the edit form
+function closeEditForm() {
+  document.getElementById('editFormContainer').style.display = 'none';
+}
+
+// Attach event listener to the delete button
+document.getElementById("delete-selected").addEventListener("click", function (e) {
+    // Prevent form submission until the user confirms
+    e.preventDefault();
+
+    // Show confirmation dialog
+    const confirmed = confirm("Are you sure you want to delete the selected feedback?");
+    
+    if (confirmed) {
+      // If confirmed, submit the form
+      document.getElementById("bulk-delete-form").submit();
+    }
+  });
+
+  // Attach confirmation to all individual delete buttons
+  document.querySelectorAll('.individual-delete-form').forEach((form) => {
+    form.addEventListener('submit', function (e) {
+      // Prevent form submission until the user confirms
+      e.preventDefault();
+
+      // Show confirmation dialog
+      const confirmed = confirm("Are you sure you want to delete this feedback?");
+      
+      if (confirmed) {
+        // If confirmed, submit the form
+        form.submit();
+      }
+    });
+  });
+
+  // Function to toggle the visibility of the solved feedback section
+  function toggleSolvedFeedback() {
+    const solvedFeedbackSection = document.getElementById("solved-feedback-section");
+    solvedFeedbackSection.classList.toggle("hidden"); // Toggle visibility
+
+    const button = document.getElementById("toggle-solved-feedback");
+    if (solvedFeedbackSection.classList.contains("hidden")) {
+      button.textContent = "Show Solved Feedback";
+    } else {
+      button.textContent = "Hide Solved Feedback";
+    }
+  }
+
+
+</script>
+
+

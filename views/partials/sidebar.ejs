@@ -5,6 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard</title>
+   <!-- style css -->
+   <link rel="stylesheet" type="text/css" href="/css/style.css">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
    <!-- adding a favicon to the tab -->
@@ -13,11 +15,12 @@
 </head>
 <body class="bg-gray-100 font-sans">
   <div class="flex h-screen">
-    <aside class="w-64 bg-gray-800 text-white flex flex-col">
+    <aside class="w-64 bg-gray-800 text-white flex flex-col fixed h-full">
     <div class="p-6 text-2xl font-bold">Admin Dashboard</div>
     <nav class="mt-6 flex-1">
       <a href="/dashboard" class="block px-6 py-3 hover:bg-gray-700">Dashboard</a>
       <a href="/room" class="block px-6 py-3 hover:bg-gray-700">Rooms</a>
       <a href="/users" class="block px-6 py-3 hover:bg-gray-700">Users</a>
+      <a href="/feedback" class="block px-6 py-3 hover:bg-gray-700">FeedBack</a>
     </nav>
   </aside>

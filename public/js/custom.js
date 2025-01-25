@@ -758,16 +758,26 @@ $(document).ready(function () {
 		// Get the selected date from the datepicker
 		var selectedDate = $datepicker.val();
 		var selectedRoomId = $('#roomSelect').val();
+		var selectedRoomText = $('#roomSelect option:selected').text(); // Get the selected room's display text
 
 
 		// Set the hidden input with the selected date
 		$('#hiddenDate').val(selectedDate);
 
 		// Display the chosen date in the second form section
-		if (selectedDate) {
-			$('.doctorname_text_chosen_date').text('Your selected meeting date is ' + selectedDate).removeClass('red-text');
-		} else {
-			$('.doctorname_text_chosen_date').text('You have not selected a date').addClass('red-text');
+		// Display the chosen date and room in the second form section
+		if (selectedDate && selectedRoomId) {
+			$('.doctorname_text_chosen_date')
+				.text(`Your selected meeting date is ${selectedDate} and room is ${selectedRoomText}`)
+				.removeClass('red-text');
+		} else if (!selectedDate) {
+			$('.doctorname_text_chosen_date')
+				.text('You have not selected a date')
+				.addClass('red-text');
+		} else if (!selectedRoomId) {
+			$('.doctorname_text_chosen_date')
+				.text('You have not selected a room')
+				.addClass('red-text');
 		}
 
 		console.log('Selected Date:', selectedDate); // For debugging
@@ -839,6 +849,15 @@ $(document).ready(function () {
 					console.log(filteredEndTimes);
 				}
 
+				function truncateBookingId(bookingId, maxLength = 5) {
+					if (bookingId.length > maxLength) {
+						return bookingId.substring(0, maxLength) + '...';
+					}
+					return bookingId;
+				}
+				
+
+
 
 				// Populate the bookings
 				filteredBookingIds.forEach((id, index) => {
@@ -847,11 +866,12 @@ $(document).ready(function () {
 
 					const startTime = normalizedFilteredStartTimes[index];
 					const endTime = normalizedFilteredEndTimes[index];
+					const truncatedId = truncateBookingId(id);
 
 					// Create a booking card or list item
 					const bookingItem = `
 						<div class="booking-item">
-							<p><strong>Booking ID:</strong> ${id}</p>
+							<p><strong>Booking ID:</strong> ${truncatedId}</p>
 							<p><strong>Start Time:</strong> ${startTime}</p>
 							<p><strong>End Time:</strong> ${endTime}</p>
 						</div>
@@ -1061,8 +1081,8 @@ if (isToday) {
 		// Hide the second form section and show the first form section
 		$('#secondForm').hide();
 		$('#firstForm').show();
-		$('select[name="start"] option, select[name="end"] option').prop('disabled', false).removeClass('disabled-option');
-		$submitButton.prop('disabled', true);
+		// $('select[name="start"] option, select[name="end"] option').prop('disabled', false).removeClass('disabled-option');
+		// $submitButton.prop('disabled', true);
 	});
 
 	// Hide the second form and reset values when the 'back' button is clicked
@@ -1472,6 +1492,117 @@ function toggleAllUsers() {
   
 
   
-
+///////Feedback Management
+// Toggle all feedback checkboxes
+function toggleAllFeedbacks() {
+	const bulkSelectAll = document.getElementById("bulk-select-all");
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox");
+	checkboxes.forEach((checkbox) => {
+	  checkbox.checked = bulkSelectAll.checked;
+	});
+	toggleDeleteFeedbackButton();
+  }
+  
+  // Toggle delete button visibility
+  function toggleDeleteFeedbackButton() {
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+	const deleteButton = document.getElementById("deleteButton");
+	deleteButton.style.display = checkboxes.length > 0 ? "inline-block" : "none";
+  }
+  
+  // Bulk delete feedbacks
+  async function deleteSelectedFeedbacks() {
+	const selectedCheckboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+	const feedbackIds = Array.from(selectedCheckboxes).map((checkbox) => checkbox.value);
+  
+	if (feedbackIds.length === 0) {
+	  alert("No feedbacks selected for deletion.");
+	  return;
+	}
+  
+	if (!confirm(`Are you sure you want to delete ${feedbackIds.length} feedback(s)?`)) {
+	  return;
+	}
+  
+	try {
+	  for (const feedbackId of feedbackIds) {
+		await fetch(`/feedbacks/${feedbackId}`, { method: "DELETE" });
+	  }
+  
+	  alert("Selected feedback(s) deleted successfully!");
+	  window.location.reload();
+	} catch (error) {
+	  console.error("Error deleting feedbacks:", error);
+	  alert("An error occurred while deleting the feedback(s).");
+	}
+  }
+  
+  // Individual delete
+  function deleteFeedback(feedbackId) {
+	// Confirm the deletion action with the user
+	const confirmation = confirm("Are you sure you want to delete this feedback?");
+	if (!confirmation) {
+	  return;
+	}
+  
+	// Make an HTTP DELETE request to the server
+	fetch(`/feedbacks/${feedbackId}`, {
+	  method: "DELETE",
+	})
+	  .then((response) => {
+		if (!response.ok) {
+		  throw new Error("Failed to delete the feedback.");
+		}
+		return response.json();
+	  })
+	  .then((data) => {
+		// Remove the feedback row from the table in the DOM
+		const feedbackRow = document.querySelector(`[data-feedback-id="${feedbackId}"]`);
+		if (feedbackRow) feedbackRow.remove();  // Ensure feedbackRow exists before removing it
+  
+		alert("Feedback deleted successfully!");
+	  })
+	  .catch((error) => {
+		console.error(error);
+		alert("An error occurred while trying to delete the feedback.");
+	  });
+  }
+  
+  // Show the edit form with feedback data populated
+  function showEditFeedbackForm(feedbackId) {
+	const row = document.querySelector(`tr[data-feedback-id="${feedbackId}"]`);
+  
+	if (row) {
+	  document.getElementById("editFeedbackId").value = feedbackId;
+	  document.getElementById("editFeedbackUserName").value = row.querySelector(".feedback-user-name").innerText;
+	  document.getElementById("editFeedbackComments").value = row.querySelector(".feedback-comments").innerText;
+	  document.getElementById("editFeedbackRating").value = row.querySelector(".feedback-rating").innerText;
+  
+	  const form = document.getElementById("editFeedbackForm");
+	  form.action = `/update-feedback/${feedbackId}`;
+	  document.getElementById("editFormContainer").classList.remove("hidden");
+	} else {
+	  console.error("Feedback row not found!");
+	}
+  }
+  
+  // Close the edit form
+  function closeEditFeedbackForm() {
+	document.getElementById("editFormContainer").classList.add("hidden");
+  }
+  
+  // Show the Create Feedback Form
+  function showCreateFeedbackForm() {
+	document.getElementById("createFormContainer").classList.remove("hidden");
+  }
+  
+  // Close the Create Feedback Form
+  function closeCreateFeedbackForm() {
+	document.getElementById("createFormContainer").classList.add("hidden");
+  }
+  
+  // Bind the create button to show the create form
+  document.querySelector(".bg-blue-500").addEventListener("click", showCreateFeedbackForm);
+  
 
 
