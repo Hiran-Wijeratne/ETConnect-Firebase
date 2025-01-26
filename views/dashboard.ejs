@@ -1,28 +1,70 @@
 <%- include("partials/sidebar.ejs") %>
 
-    <!-- Main Content -->
-    <div class="flex-1 flex flex-col ml-64">
-      <header class="bg-white shadow p-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold">Welcome, Admin!</h1>
-        <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Logout</button>
-      </header>
+<main class="p-6 flex flex-col gap-6">
+  <!-- Today's Date Section -->
+  <section class="bg-white p-6 rounded-lg shadow">
+    <h2 class="text-lg font-bold">Today's Date</h2>
+    <% if (locals.currentDate && locals.currentDate.length > 0) { %>
+    <p class="text-sm">Date: <%= currentDate %></p>
+    <%}%>
+  </section>
 
-      <main class="p-6 flex flex-col gap-6 ">
-        <main class="p-6 flex flex-col gap-6">
-            <section class="bg-white p-6 rounded-lg shadow">
-              <h2 class="text-lg font-bold">Today's Date</h2>
-              <p class="text-sm">Date: <%= currentDate %></p>
-            </section>
-          </main>          
-      </main>
-      
-      </main>
+  <% if (locals.errorMessage && locals.errorMessage.length > 0) { %>
+    <div class="mt-5"></div>
+    <div
+    class="error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+    role="alert"
+  >
+        <span class="block sm:inline"><%= errorMessage %></span>
     </div>
-  </div>
+    <div class="mt-5"></div>
+  <% } %>
 
+  <!-- Password Change Section (Visible if email is in session) -->
+  <% if (locals.email && locals.email.length > 0) { %>
+    <section class="bg-white p-6 rounded-lg shadow mt-6">
+      <h2 class="text-lg font-bold">Change Password</h2>
+      <p class="text-sm">Email: <%= locals.email %></p>
 
- 
+      <button class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600" onclick="togglePasswordForm()">
+        Change Password
+      </button>
+
+      <!-- Password Change Form (Hidden by default, toggled by button) -->
+      <div id="passwordForm" class="mt-4 hidden">
+        <form action="/change-password" method="POST">
+          <div class="mb-4">
+            <label for="currentPassword" class="block text-sm">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" class="w-full p-2 border border-gray-300 rounded" required>
+          </div>
+
+          <div class="mb-4">
+            <label for="newPassword" class="block text-sm">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" class="w-full p-2 border border-gray-300 rounded" required>
+          </div>
+
+          <div class="mb-4">
+            <label for="confirmPassword" class="block text-sm">Confirm New Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" class="w-full p-2 border border-gray-300 rounded" required>
+          </div>
+
+          <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+            Submit
+          </button>
+        </form>
+      </div>
+    </section>
+  <% } %>
+</main>
+
 <script src="/js/custom.js"></script>
+<script>
+  // Function to toggle password change form visibility
+  function togglePasswordForm() {
+    const form = document.getElementById("passwordForm");
+    form.classList.toggle("hidden");
+  }
+</script>
 
 </body>
 </html>

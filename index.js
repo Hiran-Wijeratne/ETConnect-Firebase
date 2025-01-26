@@ -86,13 +86,19 @@ const transporter = nodemailer.createTransport({
 
 //Admin Rooom Management Backend Routes
 app.get("/dashboard", (req, res) => {
+  if (req.isAuthenticated()) {
+  const email = req.session.email || null;
   const currentDate = moment().format('DD/MM/YYYY'); // Format date using moment
-  res.render("dashboard.ejs", { currentDate });
+  res.render("dashboard.ejs", { currentDate, email });
+} else {
+  res.redirect("/login");
+}
 });
 
 app.get("/room", async (req, res) => {
   try {
     // Get a reference to the 'meeting_rooms' collection
+    const email = req.session.email || null;
     const roomsCollectionRef = collection(db, "meeting_rooms");
 
     // Get the documents from the collection
@@ -110,7 +116,7 @@ app.get("/room", async (req, res) => {
     }));
 
     // Pass the rooms data to the EJS template
-    res.render("room.ejs", { rooms });
+    res.render("room.ejs", { rooms, email });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error retrieving rooms data.");
@@ -256,6 +262,8 @@ app.delete("/rooms", async (req, res) => {
 ///////User Management Routes
 app.get("/users", async (req, res) => {
   try {
+    const email = req.session.email || null;
+    const errorMessage = req.query.errorMessage; 
     const usersCollectionRef = collection(db, "users");
     const snapshot = await getDocs(usersCollectionRef);
 
@@ -269,9 +277,9 @@ app.get("/users", async (req, res) => {
         id: doc.id,
         ...doc.data(),
       }))
-      .filter(user => user.role !== 'superadmin'); // Exclude 'superadmin' role
+      // .filter(user => user.role !== 'superadmin'); // Exclude 'superadmin' role
 
-    res.render("users.ejs", { users });
+    res.render("users.ejs", { users, errorMessage, email });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error retrieving users data.");
@@ -301,7 +309,7 @@ app.post("/update-user/:userId", async (req, res) => {
     });
 
     if (emailExists) {
-      req.flash("error", "Email already exists. Please use a different email.");
+      req.flash("error", "The updated email already exists. Please try a different email.");
       return res.redirect("/users");
     }
 
@@ -385,6 +393,7 @@ app.post("/create-user", async (req, res) => {
 
 app.get("/feedback", async (req, res) => {
   try {
+    const email = req.session.email || null;
     const feedbackCollection = collection(db, "feedback");
     const feedbackSnapshot = await getDocs(feedbackCollection);
 
@@ -396,7 +405,7 @@ app.get("/feedback", async (req, res) => {
       else feedbackSolved.push(feedback);
     });
 
-    res.render("feedback.ejs", { feedbackPending, feedbackSolved });
+    res.render("feedback.ejs", { feedbackPending, feedbackSolved, email });
   } catch (error) {
     res.status(500).send("Error fetching feedback: " + error.message);
   }
@@ -464,7 +473,58 @@ app.post("/delete-selected-feedback", async (req, res) => {
   }
 });
 
+app.post("/change-password", async (req, res) => {
+  if (req.isAuthenticated()) {
+    const email = req.session.email;
+  const currentDate = moment().format('DD/MM/YYYY'); 
+  const { currentPassword, newPassword, confirmPassword } = req.body;
 
+  // Check if the new password and confirm password match
+  if (newPassword !== confirmPassword) {
+    return res.render("dashboard.ejs", { errorMessage: "New passwords do not match.", email, currentDate });
+  }
+
+  try {
+    // Get the user's email from the session
+    // const email = req.session.email;
+    if (!email) {
+      return res.render("dashboard.ejs", { errorMessage: "User not authenticated." });
+    }
+
+    // Query Firestore for the user by email
+    const userQuerySnapshot = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+
+    if (!userQuerySnapshot.empty) {
+      const userDoc = userQuerySnapshot.docs[0]; // Get the first document (user)
+      const userData = userDoc.data();
+      const storedHashedPassword = userData.password; // Hashed password from Firestore
+
+      // Compare current password with the stored hashed password
+      const isMatch = await bcrypt.compare(currentPassword, storedHashedPassword);
+      if (!isMatch) {
+        return res.render("dashboard.ejs", { errorMessage: "Current password is incorrect.", email, currentDate });
+      }
+
+      // Hash the new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update the password in Firestore
+      const userRef = doc(db, "users", userDoc.id); // Reference to the user document
+      await updateDoc(userRef, { password: hashedNewPassword });
+
+      // Respond with success
+      return res.render("dashboard.ejs", { successMessage: "Password updated successfully!" , email, currentDate});
+    } else {
+      return res.render("dashboard.ejs", { errorMessage: "User not found.",email, currentDate });
+    }
+  } catch (err) {
+    console.error("Error changing password:", err);
+    return res.render("dashboard.ejs", { errorMessage: "An error occurred. Please try again." , email, currentDate});
+  }
+} else {
+  res.redirect("/login");
+}
+});
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -606,13 +666,29 @@ app.get("/register", (req, res) => {
 
 app.get("/logout", (req, res, next) => {
   req.logout(function (err) {
+    const fromAdmin = req.body.fromAdmin || false;
     if (err) {
       return next(err);
     }
-    // Redirect back to the referrer (the current page)
-    res.redirect(req.get("referer") || "/"); // Fallback to home if referer is not available
+    // Destroy the session to ensure complete logout
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Error destroying session:", err);
+        return next(err);
+      }
+      if (fromAdmin) {
+        // If it's from the admin panel, redirect to the users page or another admin page
+        res.redirect("/login");  // Change this to your desired redirect URL
+      } else {
+        // Redirect to the login page if it's a normal user registration
+        res.redirect(req.get("referer") || "/"); // Fallback to home if referer is not available
+      }
+      // Redirect to login or home page
+      
+    });
   });
 });
+
 
 
 app.get("/auth/google",
@@ -643,7 +719,14 @@ app.post("/register", async (req, res) => {
     const userQuerySnapshot = await getDocs(query(collection(db, "users"), where("email", "==", email)));
 
     if (!userQuerySnapshot.empty) {
-      res.render("register.ejs", { errorMessage: "Email already exists. Try logging in." });
+      if (fromAdmin) {
+        // If it's from the admin panel, redirect to the users page or another admin page
+        res.redirect(`/users?errorMessage=${encodeURIComponent("Email/username already exists. Try to create a different user.")}`);  // Change this to your desired redirect URL
+      } else {
+        // Redirect to the login page if it's a normal user registration
+        res.render("register.ejs", { errorMessage: "Email/username already exists. Try logging in." });
+      }
+      
     } else {
       // Hash the password using bcrypt
       bcrypt.hash(password, saltRounds, async (err, hash) => {
@@ -679,12 +762,44 @@ app.post("/register", async (req, res) => {
 
 
 
-app.post("/login", passport.authenticate("local", {
-  successRedirect: '/',  // Redirect to the landing page on success
-  failureRedirect: '/login',  // Redirect to login page on failure
-  failureFlash: true  // Enable flash messages on failure
-})
+app.post(
+  "/login",
+  (req, res, next) => {
+    passport.authenticate("local", (err, user, info) => {
+      if (err) {
+        req.flash("error", "An error occurred during login. Please try again."); // Generic error message
+        return res.redirect("/login");
+      }
+
+      if (!user) {
+        // Handle specific failure messages from `info`
+        if (info && info.message) {
+          req.flash("error", info.message);
+        } else {
+          req.flash("error", "Invalid credentials. Please try again.");
+        }
+        return res.redirect("/login");
+      }
+
+      req.logIn(user, (err) => {
+        if (err) {
+          req.flash("error", "An error occurred while logging in. Please try again.");
+          return res.redirect("/login");
+        }
+
+        req.session.email = user.email;
+
+        // Redirect based on user role
+        if (user.role === "superadmin") {
+          return res.redirect("/dashboard");
+        }
+
+        return res.redirect("/");
+      });
+    })(req, res, next);
+  }
 );
+
 
 passport.use("local", 
   new Strategy(async function verify(username, password, cb) {
@@ -726,6 +841,7 @@ passport.use("local",
     }
   })
 );
+
 
 passport.use("google", new GoogleStrategy({ // google strategy also have to have uid to sequalize the user
   clientID: process.env.GOOGLE_CLIENT_ID,

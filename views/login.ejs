@@ -31,8 +31,8 @@
   <body>
     <div class="container mt-5">
       <div class="mt-5"></div>
-      <% if (locals.messages && locals.messages.length > 0) { %>
-        <% messages.forEach(function(message) { %>
+      <% if (locals.errorMessage && locals.errorMessage.length > 0) { %>
+        <% errorMessage.forEach(function(message) { %>
           <div class="mt-5"></div>
           <div class="alert-login alert-danger">
             <%= message %>
@@ -49,7 +49,7 @@
             <div class="card-body">
               <form action="/login" method="POST">
                 <div class="form-group">
-                  <label for="username">Username</label>
+                  <label for="username">Email/Username</label>
                   <input type="text" autocomplete="off" class="form-control" name="username" placeholder="username">
                 </div>
                 <div class="form-group">
