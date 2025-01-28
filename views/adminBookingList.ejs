@@ -1,0 +1,171 @@
+<%- include("partials/header.ejs") %>
+    </div>
+
+    <div class="container mt-5">
+        <div class="about_bt_calendar_view my-5">
+            <a id="calendarView" style="color: white;">Calendar View</a>
+            <!-- New button to open calendar in a new tab -->
+            <button id="openCalendarNewTab" class="btn btn-secondary" style="margin-left: 10px; padding-left: 10px; padding-right: 10px;">
+                <span class="material-icons">open_in_new</span>
+            </button>
+        </div>
+
+        <h1 class="about_taital">Upcoming Bookings</h1>
+        <div id="calendarContainer">
+            <div id='calendar'></div>
+        </div>
+
+
+        <!-- Booking Table -->
+        <div id="bookingsTableContainer" style="width:100%">
+            <table id="upcomingTable" class="display" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Meeting Date</th>
+                        <th>Start Time</th>
+                        <th>End Time</th>
+                        <th>Description</th>
+                        <th>Room</th>
+                        <th>Created Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    <% upcomingBookings.forEach(booking=> { %>
+                        <tr>
+                            <td>
+                                <%= booking.booking_id.slice(0, 2) + '...' %>
+                            </td>
+                            <td>
+                                <%= booking.username %>
+                            </td>
+                            <td>
+                                <%= booking.date %>
+                            </td>
+                            <td>
+                                <%= booking.start_time.split(':').slice(0, 2).join(':') %>
+                            </td>
+                            <td>
+                                <%= booking.end_time.split(':').slice(0, 2).join(':') %>
+                            </td>
+                            <td>
+                                <%= booking.description %>
+                            </td>
+                            <td>
+                                <%= booking.room %>
+                            </td>
+                            <td>
+                                <%= booking.booking_date %>
+                            </td>
+                            <td>
+                                <!-- Action Buttons -->
+                                  <button onclick="window.location.href='/edit-booking/<%= booking.booking_id %>'" title="Edit">
+                                    <span class="material-icons">edit</span>
+                                  </button>
+                                 <button onclick="confirmDelete('<%= booking.booking_id %>')" title="Delete">
+                                    <span class="material-icons">delete</span>
+                                  </button>
+                            </td>
+                        </tr>
+                        <% }); %>
+                </tbody>
+            </table>
+
+
+            <!-- Toggle past bookings -->
+            <div class="about_bt my-5">
+                <a id="togglePastBookings" style="color: white;">Past Bookings</a>
+            </div>
+            <div id="pastBookingsSection" class="mt-5" style="display: none;" style="width:100%">
+                <h1 class="about_taital mt-5">Past Bookings</h1>
+                <table id="pastTable" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Meeting Date</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Description</th>
+                            <th>Room</th>
+                            <th>Created Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% pastBookings.forEach(booking=> { %>
+                            <tr>
+                                <td>
+                                    <%= booking.booking_id.slice(0, 2) + '...' %>
+                                </td>
+                                <td>
+                                    <%= booking.username %>
+                                </td>
+                                <td>
+                                    <%= booking.date %>
+                                </td>
+                                <td>
+                                    <%= booking.start_time.split(':').slice(0, 2).join(':') %>
+                                </td>
+                                <td>
+                                    <%= booking.end_time.split(':').slice(0, 2).join(':') %>
+                                </td>
+                                <td>
+                                    <%= booking.description %>
+                                </td>
+                                <td>
+                                    <%= booking.room %>
+                                </td>
+                                <td>
+                                    <%= booking.booking_date %>
+                                </td>
+                            </tr>
+                            <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Modal for Event Details -->
+    <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventModalLabel">Booking Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Name:</strong> <span id="modalTitle"></span></p>
+                    <p><strong>Start:</strong> <span id="modalStart"></span></p>
+                    <p><strong>End:</strong> <span id="modalEnd"></span></p>
+                    <p><strong>Room:</strong> <span id="modalAttendees"></span></p>
+                    <p><strong>Purpose:</strong> <span id="modalDescription"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Serialize the upcoming bookings as JSON
+        const upcomingBookings = <%- JSON.stringify(upcomingBookings) %>;
+        localStorage.setItem('upcomingBookings', JSON.stringify(upcomingBookings));
+
+        function confirmDelete(bookingId) {
+      const userConfirmed = confirm('Are you sure you want to delete this booking? This action cannot be undone.');
+      if (userConfirmed) {
+        // Redirect to the delete route if confirmed
+        window.location.href = `/delete/${bookingId}`;
+      }
+    }
+  </script>
+
+    </script>
+
+    <%- include("partials/footer.ejs") %>

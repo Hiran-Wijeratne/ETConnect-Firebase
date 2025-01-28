@@ -87,8 +87,7 @@
                         <a class="nav-link" href="/about.html">About</a>
                      </li>
                      <li class="nav-item">
-                        <a class="nav-link" href="/bookinglist">Booking List</a>
-                     </li>
+                        <a class="nav-link bookingListLink" href="#">Booking List</a>
                      <li class="nav-item">
                         <a class="nav-link" href="/mybookings">My Boookings</a>
                      </li>
@@ -105,7 +104,7 @@
                   <ul>
                      <li class="active"><a href="/">Home</a></li>
                      <li><a href="/about.html">About</a></li>
-                     <li><a href="/bookinglist">Booking List</a></li>
+                     <li><a class="bookingListLink" href="#">Booking List</a></li>
                      <li><a href="/mybookings">My Bookings</a></li>
                      <li><a href="/contact.html">Contact Us</a></li>
                   </ul>
@@ -125,3 +124,34 @@
                 </form>                
             </div>
          </div>
+
+         <script>
+            // Check if there is a user in the locals object (meaning the user is logged in)
+            const userRole = "<%= locals.user ? locals.user.role : null %>"; // Will be null if no user is logged in
+         
+            // Get all elements with the 'bookingListLink' class
+            const bookingListLinks = document.querySelectorAll(".bookingListLink");
+         
+            // Loop through each element and add an event listener
+            bookingListLinks.forEach(link => {
+               link.addEventListener("click", function (e) {
+                  e.preventDefault(); // Prevent the default link action
+         
+                  if (userRole) {
+                     // If the user is logged in, check if the role is admin
+                     if (userRole === "admin") {
+                        // Redirect to the admin booking list page
+                        window.location.href = "/adminbookinglist";
+                     } else {
+                        // Redirect to the regular booking list page for a non-admin user
+                        window.location.href = "/bookinglist";
+                     }
+                  } else {
+                     // If no user is logged in, redirect to the regular booking list page
+                     window.location.href = "/bookinglist"; // Go to the normal booking list route
+                  }
+               });
+            });
+         </script>
+         
+         

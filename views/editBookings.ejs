@@ -260,27 +260,27 @@
 
 
   
-  document.addEventListener('DOMContentLoaded', () => {
-  const roomSelect = $('#roomSelect');
-  const startTimeSelect = $('select[name="start"]');
-  const endTimeSelect = $('select[name="end"]');
+//   document.addEventListener('DOMContentLoaded', () => {
+//   const roomSelect = $('#roomSelect');
+//   const startTimeSelect = $('select[name="start"]');
+//   const endTimeSelect = $('select[name="end"]');
 
-  // Function to reset the time slots
-  function resetTimeSlots() {
-    // Reset the start time selection
-    startTimeSelect.val(''); // Set to default value (e.g., placeholder value)
-    startTimeSelect.niceSelect('update'); // Update Nice Select dropdown
+//   // Function to reset the time slots
+//   function resetTimeSlots() {
+//     // Reset the start time selection
+//     startTimeSelect.val(''); // Set to default value (e.g., placeholder value)
+//     startTimeSelect.niceSelect('update'); // Update Nice Select dropdown
 
-    // Reset the end time selection
-    endTimeSelect.val('');
-    endTimeSelect.niceSelect('update');
-  }
+//     // Reset the end time selection
+//     endTimeSelect.val('');
+//     endTimeSelect.niceSelect('update');
+//   }
 
-  // Event listener for room selection change
-  roomSelect.on('change', () => {
-    resetTimeSlots();
-  });
-});
+//   // Event listener for room selection change
+//   roomSelect.on('change', () => {
+//     resetTimeSlots();
+//   });
+// });
 
 
 </script>

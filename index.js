@@ -96,6 +96,7 @@ app.get("/dashboard", (req, res) => {
 });
 
 app.get("/room", async (req, res) => {
+  if (req.isAuthenticated()) {
   try {
     // Get a reference to the 'meeting_rooms' collection
     const email = req.session.email || null;
@@ -121,6 +122,9 @@ app.get("/room", async (req, res) => {
     console.error(error);
     res.status(500).send("Error retrieving rooms data.");
   }
+} else {
+  res.redirect("/login");
+}
 });
 
 app.post('/update-room/:roomId', async (req, res) => {
@@ -261,6 +265,7 @@ app.delete("/rooms", async (req, res) => {
 
 ///////User Management Routes
 app.get("/users", async (req, res) => {
+  if (req.isAuthenticated()) {
   try {
     const email = req.session.email || null;
     const errorMessage = req.query.errorMessage; 
@@ -284,6 +289,9 @@ app.get("/users", async (req, res) => {
     console.error(error);
     res.status(500).send("Error retrieving users data.");
   }
+} else {
+  res.redirect("/login");
+}
 });
 
 app.post("/update-user/:userId", async (req, res) => {
@@ -392,6 +400,7 @@ app.post("/create-user", async (req, res) => {
 ///////FeedBack Management Routes
 
 app.get("/feedback", async (req, res) => {
+  if (req.isAuthenticated()) {
   try {
     const email = req.session.email || null;
     const feedbackCollection = collection(db, "feedback");
@@ -409,6 +418,9 @@ app.get("/feedback", async (req, res) => {
   } catch (error) {
     res.status(500).send("Error fetching feedback: " + error.message);
   }
+} else {
+  res.redirect("/login");
+}
 });
 
 // Add new feedback
@@ -941,6 +953,87 @@ app.get("/bookinglist", async (req, res) => {
   }
 });
 
+app.get("/adminbookinglist", async (req, res) => {
+  if (req.isAuthenticated()) {
+  try {
+    const currentDate = moment(); // Get the current date and time
+    const currentDateString = currentDate.format("YYYY-MM-DD");
+    const currentTime = currentDate.format("HH:mm:ss");
+    const pastLimitDate = moment().subtract(30, "days").format("YYYY-MM-DD");
+
+    // Query for upcoming bookings (today or after today), ordered by date and starttime
+    const upcomingQuery = query(
+      collection(db, "bookings"),
+      where("date", ">=", currentDateString),  // Fetch bookings for today and beyond
+      orderBy("date", "asc"),
+      orderBy("starttime", "asc")
+    );
+
+    // Query for past bookings (before today), ordered by date and starttime
+    const pastQuery = query(
+      collection(db, "bookings"),
+      where("date", "<", currentDateString),
+      where("date", ">=", pastLimitDate),
+      orderBy("date", "desc"),
+      orderBy("starttime", "desc")
+    );
+
+    const upcomingSnapshot = await getDocs(upcomingQuery);
+    const pastSnapshot = await getDocs(pastQuery);
+
+    // Function to format bookings
+    const formatBookings = (snapshot) => {
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        const bookingDate = moment(data.date);
+        const endTime = moment(data.endtime, "HH:mm:ss");
+
+        let status = "upcoming"; // Default status
+
+        // Check if the booking is in the past (based on end time)
+        if (bookingDate.isBefore(currentDate, "day") || 
+            (bookingDate.isSame(currentDate, "day") && endTime.isBefore(currentDate, "minute"))) {
+          status = "past"; // Set status as 'past' if date is before today or time has passed for today
+        }
+
+        return {
+          booking_id: doc.id,
+          username: data.email || 'Unknown', // Default value if 'name' is missing
+          date: bookingDate.format("DD-MM-YYYY"),
+          start_time: data.starttime || 'N/A',
+          end_time: data.endtime || 'N/A',
+          description: data.des || data.description || 'No description',
+          room: data.room_name ? data.room_name.replace(/\s*\(.*?\)\s*/g, '').trim() : 'N/A',
+          booking_date: data.created_at
+            ? (data.created_at.toDate
+                ? moment(data.created_at.toDate()).format("YYYY-MM-DD")
+                : moment(data.created_at).format("YYYY-MM-DD"))
+            : 'N/A',
+          status: status // Add status field to track whether booking is past or upcoming
+        };
+        
+      });
+    };
+
+    // Format both upcoming and past bookings
+    const upcomingBookings = formatBookings(upcomingSnapshot);
+    const pastBookings = formatBookings(pastSnapshot);
+
+    // Filter past bookings from upcoming ones based on status
+    const allBookings = [...upcomingBookings, ...pastBookings];
+    const filteredUpcomingBookings = allBookings.filter(booking => booking.status === "upcoming");
+    const filteredPastBookings = allBookings.filter(booking => booking.status === "past");
+
+    res.render("adminBookingList.ejs", { upcomingBookings: filteredUpcomingBookings, pastBookings: filteredPastBookings });
+  } catch (err) {
+    console.error("Error retrieving bookings:", err);
+    res.status(500).send("Error retrieving bookings.");
+  }
+} else {
+  res.redirect("/login");
+}
+});
+
 app.get("/mybookings", async (req, res) => {
   if (req.isAuthenticated()) {
     const currentDate = moment().format("YYYY-MM-DD");
@@ -1397,6 +1490,7 @@ app.get('/delete/:id', async (req, res) => {
   if (req.isAuthenticated()) {
     const bookingId = req.params.id; // Extract bookingId from the URL
     const userEmail = req.user.email; // Get the email of the logged-in user
+    const userRole = req.user.role;
 
     try {
       const bookingRef = doc(db, "bookings", bookingId);
@@ -1404,6 +1498,15 @@ app.get('/delete/:id', async (req, res) => {
   
       if (!bookingSnap.exists()) {
         return res.status(404).send("Booking not found");
+      }
+
+      if (userRole === 'admin') {
+        // Admin is allowed to delete any booking
+        await deleteDoc(bookingRef);
+        return res.render('delete-confirmation.ejs', {
+          bookingId: req.params.id,
+          user: req.session.user
+        });
       }
   
       // Verify that the booking belongs to the current user
