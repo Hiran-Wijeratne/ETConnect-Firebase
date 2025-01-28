@@ -644,9 +644,6 @@ app.get('/rooms/fully-booked', (req, res) => {
   });
 });
 
-
-
-
 app.get('/api/user', (req, res) => {
    const user = req.isAuthenticated() ? req.user : null;
    res.json(user); // Send the user data as JSON response
@@ -688,8 +685,6 @@ app.get("/logout", (req, res, next) => {
     });
   });
 });
-
-
 
 app.get("/auth/google",
   passport.authenticate("google", {
@@ -760,8 +755,6 @@ app.post("/register", async (req, res) => {
   }
 });
 
-
-
 app.post(
   "/login",
   (req, res, next) => {
@@ -799,7 +792,6 @@ app.post(
     })(req, res, next);
   }
 );
-
 
 passport.use("local", 
   new Strategy(async function verify(username, password, cb) {
@@ -841,7 +833,6 @@ passport.use("local",
     }
   })
 );
-
 
 passport.use("google", new GoogleStrategy({ // google strategy also have to have uid to sequalize the user
   clientID: process.env.GOOGLE_CLIENT_ID,
@@ -916,7 +907,7 @@ app.get("/bookinglist", async (req, res) => {
         }
 
         return {
-          booking_id: doc.id.substring(0, 2) + '...',
+          booking_id: doc.id,
           username: data.email || 'Unknown', // Default value if 'name' is missing
           date: bookingDate.format("DD-MM-YYYY"),
           start_time: data.starttime || 'N/A',
@@ -973,7 +964,7 @@ app.get("/mybookings", async (req, res) => {
         const bookingEndTime = moment(`${data.date} ${data.endtime}`, "YYYY-MM-DD HH:mm:ss");
 
         return {
-          booking_id: doc.id.substring(0, 2) + '...',
+          booking_id: doc.id,
           username: data.email || "Unknown", // Default to 'Unknown' if 'email' is missing
           date: moment(data.date).format("DD-MM-YYYY"),
           start_time: moment(data.starttime, "HH:mm:ss").format("HH:mm")|| "Invalid", // Format start time to HH:mm
@@ -1122,13 +1113,35 @@ app.post('/edit', async (req, res) => {
         startTime.setMinutes(startTime.getMinutes() + 15);
       }
 
+       // Step 5: Fetch the user's email and send a confirmation email
+       const userEmail = req.user.email;
+       if (emailValidator.validate(userEmail)) {
+         const mailOptions = {
+           from: 'your-email@domain.com', // sender address (must be the same as the SMTP user)
+           to: userEmail,  // recipient address (user's email)
+           subject: 'Booking Update Confirmation', // email subject
+           text: `Hello ${userEmail},\n\nYour booking has been updated.\n\nUpdated Details:\nRoom: ${room_name || "ETC Meeting Room"}\nDate: ${formattedDate}\nStart Time: ${start}\nEnd Time: ${end}\nPurpose: ${updatedPurpose}\n\nThank you for using our booking system.\n\nThis is an auto-generated email. Please do not reply to this email.`,
+         };
+ 
+         transporter.sendMail(mailOptions, (error, info) => {
+           if (error) {
+             console.error('Error sending email:', error);
+           } else {
+             console.log('Email sent:', info.response);
+           }
+         });
+       } else {
+         console.log('Invalid email format, not sending email.');
+       }
+ 
+
       res.render("confirmation.ejs", {
         booking: {
           id: bookingId,
           date: `${day}-${month}-${year}`,
           startTime: start,
           endTime: end,
-          room: room_name ? room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
+          room: room_name ? room_name.replace(/\(.*?\)/g, '').trim() : 'Room not found',
           purpose: updatedPurpose,
         },
         timeslots,
@@ -1269,8 +1282,8 @@ app.post('/submit', async (req, res) => {
           from: 'your-email@domain.com', // sender address (must be the same as the SMTP user)
           to: req.user.email,  // recipient address (user's email)
           subject: 'Booking Confirmation', // email subject
-          text: `Hello ${req.user.email},\n\nYour booking has been confirmed.\n\nDetails:\nRoom: ${roomName || "Room 1"}\nDate: ${formattedDate}\nStart Time: ${start}\nEnd Time: ${end}\nPurpose: ${purpose}\n\nThank you for using our booking system.`, // email body
-        };
+          text: `Hello ${req.user.email},\n\nYour booking has been confirmed.\n\nDetails:\nRoom: ${roomName || "Room 1"}\nDate: ${formattedDate}\nStart Time: ${start}\nEnd Time: ${end}\nPurpose: ${purpose}\n\nThank you for using our booking system.\n\nThis is an auto-generated email. Please do not reply to this email.`,
+        };        
 
         // Try sending the email in a non-blocking way
         transporter.sendMail(mailOptions, (error, info) => {
@@ -1460,7 +1473,6 @@ passport.deserializeUser(async (id, cb) => {
     cb(err);
   }
 });
-
 
 app.listen(port, () => {
   console.log(`Listening on port ${port}`);

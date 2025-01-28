@@ -619,11 +619,13 @@ $('#toggleMyPastBookings').on('click', function () {
 
 var dateSelectedCustomeDatepicker = false;
 var purposeIsStated = false;
+var roomIsSelected = false;
 
 // custom js
 function onDateChange($datepickerElement) {
 	const selectedDate = $datepickerElement.val().trim();
 	const $nextButton = $('#nextButton'); // Adjust to your specific button selector
+	const $submitButton = $('input[type="submit"]');
 
 	if (selectedDate !== '') {
 		console.log("datepicker is selected");
@@ -640,7 +642,19 @@ function onDateChange($datepickerElement) {
 	$('select[name="end"]').val('');
 	$('#end-time-error').remove();
 	$('select').niceSelect('update');
+	$submitButton.prop('disabled', true);
 }
+
+
+
+// Select the room and timeslot dropdowns using jQuery
+// $('#roomSelect').on('change', function() {
+// 	// Clear the selected value of timeslot
+// 	$('select[name="start"]').val('');
+// 	$('select[name="end"]').val('');
+// 	$('select').niceSelect('update');
+//   });
+  
 
 $(document).ready(function () {
 	$('select').niceSelect();
@@ -661,6 +675,32 @@ $(window).on('pageshow', function (event) {
 	}
   });
 
+  $(document).ready(() => {
+	const roomSelect = $('#roomSelect');
+	const startTimeSelect = $('select[name="start"]');
+	const endTimeSelect = $('select[name="end"]');
+  
+	// Function to reset the time slots
+	function resetTimeSlots() {
+	  // Reset the start time selection
+	  startTimeSelect.val(''); // Set to default value (e.g., placeholder value)
+	  startTimeSelect.niceSelect('update'); // Update Nice Select dropdown
+  
+	  // Reset the end time selection
+	  endTimeSelect.val('');
+	  endTimeSelect.niceSelect('update');
+	}
+  
+	// Event listener for room selection change
+	roomSelect.on('change', () => {
+	const $submitButton = $('input[type="submit"]');
+	$submitButton.prop('disabled', true);
+	roomIsSelected = true;
+	  resetTimeSlots();
+	});
+  });
+  
+
 
 $(document).ready(function () {
 
@@ -678,9 +718,10 @@ $(document).ready(function () {
 	var noConflictingBookings = false;
 
 	// Disable the submit and next buttons initially
-	$submitButton.prop('disabled', true);
+	
 	if (isHomePage) {
 		$nextButton.prop('disabled', true);
+		$submitButton.prop('disabled', true);
 	}
 
 
@@ -699,7 +740,8 @@ $(document).ready(function () {
 		ordering: true,
 		info: true,
 		columnDefs: [
-			{ orderable: false, targets: [5, 6] } // Disable sorting for the 'Description' column
+			{ orderable: false, targets: [5, 6] }, // Disable sorting for the 'Description' column
+			{ searchable: false, targets: [7] }    // Disable searching for the 'created_date' column (7th column, index starts from 0)
 		],
 		stateSave: true,
 		responsive: true,  // Ensures the table is responsive
@@ -714,6 +756,10 @@ $(document).ready(function () {
 		searching: true,
 		ordering: true,
 		info: true,
+		columnDefs: [
+			{ orderable: false, targets: [5, 6] }, // Disable sorting for the 'Description' column
+			{ searchable: false, targets: [7] }    // Disable searching for the 'created_date' column (7th column, index starts from 0)
+		],
 		stateSave: true,
 		responsive: true,  // Ensures the table is responsive
 		autoWidth: true,   // Disables automatic column width calculations
@@ -727,9 +773,10 @@ $(document).ready(function () {
 		searching: true,
 		ordering: true,
 		info: true,
-		// columnDefs: [
-		//   { orderable: false, targets: [6] } // Disable sorting for the 'Description' column
-		// ],
+		columnDefs: [
+			{ orderable: false, targets: [5, 6] }, // Disable sorting for the 'Description' column
+			{ searchable: false, targets: [7] }    // Disable searching for the 'created_date' column (7th column, index starts from 0)
+		],
 		stateSave: true,
 		responsive: true,  // Ensures the table is responsive
 		autoWidth: true,   // Disables automatic column width calculations
@@ -743,6 +790,10 @@ $(document).ready(function () {
 		searching: true,
 		ordering: true,
 		info: true,
+		columnDefs: [
+			{ orderable: false, targets: [5, 6] }, // Disable sorting for the 'Description' column
+			{ searchable: false, targets: [7] }    // Disable searching for the 'created_date' column (7th column, index starts from 0)
+		],
 		stateSave: true,
 		responsive: true,  // Enables responsive behavior
 		autoWidth: true,  // Set to false to let DataTables calculate width dynamically
@@ -752,6 +803,9 @@ $(document).ready(function () {
 		]
 	});
 
+	
+	  
+
 	// Event listener for the "Next" button
 	$nextButton.on('click', function () {
 
@@ -760,25 +814,21 @@ $(document).ready(function () {
 		var selectedRoomId = $('#roomSelect').val();
 		var selectedRoomText = $('#roomSelect option:selected').text(); // Get the selected room's display text
 
+		let normalizedStartTimes = [];
+		let normalizedEndTimes = [];
+		let normalizedTimeslots = [];
+
+		let filteredBookingIds, filteredStartTimes, filteredEndTimes;
+
 
 		// Set the hidden input with the selected date
 		$('#hiddenDate').val(selectedDate);
+		// Enable all options
+		$('select option').prop('disabled', false);  // Remove 'disabled' from options
+		$('select').niceSelect('update');  // Refresh the dropdown to reflect changes
 
-		// Display the chosen date in the second form section
-		// Display the chosen date and room in the second form section
-		if (selectedDate && selectedRoomId) {
-			$('.doctorname_text_chosen_date')
-				.text(`Your selected meeting date is ${selectedDate} and room is ${selectedRoomText}`)
-				.removeClass('red-text');
-		} else if (!selectedDate) {
-			$('.doctorname_text_chosen_date')
-				.text('You have not selected a date')
-				.addClass('red-text');
-		} else if (!selectedRoomId) {
-			$('.doctorname_text_chosen_date')
-				.text('You have not selected a room')
-				.addClass('red-text');
-		}
+
+		
 
 		console.log('Selected Date:', selectedDate); // For debugging
 		console.log('Form Data:', $('form').serialize()); // Log all form data
@@ -816,11 +866,22 @@ $(document).ready(function () {
 				bookingIds = response.booking_ids;
 				console.log(timeslots);
 
+				// Empty the lists
+				normalizedStartTimes = [];
+				normalizedEndTimes = [];
+				normalizedTimeslots = [];
+
+				filteredBookingIds = [];
+				filteredStartTimes = [];
+				filteredEndTimes = [];
+
+
+
 
 				// Normalize the times
-				const normalizedEndTimes = endTimes.map(time => normalizeTimeFormat(time));
-				const normalizedTimeslots = timeslots.map(time => normalizeTimeFormat(time));
-				const normalizedStartTimes = startTimes.map(time => normalizeTimeFormat(time));
+				normalizedEndTimes = endTimes.map(time => normalizeTimeFormat(time));
+				normalizedTimeslots = timeslots.map(time => normalizeTimeFormat(time));
+				normalizedStartTimes = startTimes.map(time => normalizeTimeFormat(time));
 
 				console.log(normalizedEndTimes);
 				console.log(normalizedStartTimes);
@@ -828,8 +889,9 @@ $(document).ready(function () {
 
 				// Clear previous bookings
 				$('#bookingsList').empty();
+				
 
-				let filteredBookingIds, filteredStartTimes, filteredEndTimes;
+				
 
 				// Separate logic for homepage and editing
 				if (isHomePage) {
@@ -849,7 +911,7 @@ $(document).ready(function () {
 					console.log(filteredEndTimes);
 				}
 
-				function truncateBookingId(bookingId, maxLength = 5) {
+				function truncateBookingId(bookingId, maxLength = 2) {
 					if (bookingId.length > maxLength) {
 						return bookingId.substring(0, maxLength) + '...';
 					}
@@ -1001,29 +1063,29 @@ $(document).ready(function () {
 				}
 				
 				// **Condition for past timeslot disabling - Apply only to today**
-const timeslotArray = [
-	"08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-	"12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-	"16:00", "16:30", "17:00", "17:30"
-];
+				const timeslotArray = [
+				"08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+				"12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+				"16:00", "16:30", "17:00", "17:30"
+					];
 
-// Get current time in "HH:mm:ss" format
-const currentTime = new Date();
-const currentFormattedTime = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}:00`;
+				// Get current time in "HH:mm:ss" format
+				const currentTime = new Date();
+				const currentFormattedTime = `${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}:00`;
 
-console.log("Selected Date:", selectedDate);
+				console.log("Selected Date:", selectedDate);
 
-// Parse selectedDate (DD-MM-YYYY) into a valid Date object
-const [day, month, year] = selectedDate.split("-").map(Number);
-const selectedDateObject = new Date(year, month - 1, day); // Note: month is 0-indexed
-console.log("Parsed Selected Date:", selectedDateObject);
-// Check if the selected date is today
-// Check if selected date is today
-const isToday = (selectedDateObject.toDateString() === currentTime.toDateString());
-console.log("Is Today:", isToday);
+				// Parse selectedDate (DD-MM-YYYY) into a valid Date object
+				const [day, month, year] = selectedDate.split("-").map(Number);
+				const selectedDateObject = new Date(year, month - 1, day); // Note: month is 0-indexed
+				console.log("Parsed Selected Date:", selectedDateObject);
+				// Check if the selected date is today
+				// Check if selected date is today
+				const isToday = (selectedDateObject.toDateString() === currentTime.toDateString());
+				console.log("Is Today:", isToday);
 
-// Filter past timeslots if it's today
-if (isToday) {
+				// Filter past timeslots if it's today
+				if (isToday) {
 	const pastTimeslots = timeslotArray.filter(slot => {
 		const [hour, minute] = slot.split(":").map(Number);
 		const slotTime = new Date();
@@ -1055,21 +1117,68 @@ if (isToday) {
 	updateDropdown('select[name="start"]', isPastTime);
 	updateDropdown('select[name="end"]', isPastTime);
 
-}
+					}
+
+				
+					
+				// Display the chosen date in the second form section
+				// Display the chosen date and room in the second form section
+				if (selectedDate && selectedRoomId) {
+					if (bookingIds.length === 0) {
+							$('.doctorname_text_chosen_date')
+								.html(`No bookings yet for ${selectedDate} in ${selectedRoomText}. Be the first to book!`)
+								.removeClass('red-text');
+						
+					} else {
+							$('.doctorname_text_chosen_date')
+								.html(`Existing bookings for ${selectedDate} in ${selectedRoomText} are as follows:`)
+								.removeClass('red-text');
+					}
+				} else if (!selectedDate) {
+					$('.doctorname_text_chosen_date')
+						.text('You have not selected a date')
+						.addClass('red-text');
+				} else if (!selectedRoomId) {
+					$('.doctorname_text_chosen_date')
+						.text('You have not selected a room')
+						.addClass('red-text');
+				}	
+				
 
 
-				$('select').niceSelect('update');
-			},
-			error: function (error) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+					$('select').niceSelect('update');
+				},
+				error: function (error) {
 				console.error('Error sending date:', error);
-			}
+				}
+
+					
 		});
 
 
-		// Hide the first form section and show the second form section
-		$('#firstForm').hide();
-		$submitButton.prop('disabled', true);
-		$('#secondForm').show();
+				// Hide the first form section and show the second form section
+				$('#firstForm').hide();
+				// $submitButton.prop('disabled', true);
+				$('#secondForm').show();
 
 	});
 
@@ -1208,7 +1317,11 @@ if (isToday) {
 
 		} else {
 			purposeIsStated = true;
-			if (dateSelectedCustomeDatepicker) {
+			if(isHomePage){
+				if (dateSelectedCustomeDatepicker) {
+				$nextButton.prop('disabled', false);
+				}
+			}else{
 				$nextButton.prop('disabled', false);
 			}
 		}
@@ -1220,7 +1333,6 @@ if (isToday) {
 	$purposeInput.on('input', checkInput);
 	$('button[title="Edit"]').on('click', function (event) {
 		$nextButton.prop('disabled', false);
-
 	});
 
 	// Initial check when the page loads

@@ -51,7 +51,7 @@
             <% upcomingMyBookings.forEach(booking=> { %>
                 <tr>
                     <td>
-                        <%= booking.booking_id %>
+                        <%= booking.booking_id.slice(0, 2) + '...' %>
                     </td>
                    
                     <td>
@@ -104,7 +104,7 @@
             <% pastMyBookings.forEach(booking=> { %>
                 <tr>
                     <td>
-                        <%= booking.booking_id %>
+                        <%= booking.booking_id.slice(0, 2) + '...' %>
                     </td>
                     
                     <td>
