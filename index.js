@@ -423,7 +423,6 @@ app.get("/feedback", async (req, res) => {
 }
 });
 
-// Add new feedback
 app.post("/add-feedback", async (req, res) => {
   try {
     const { name, email, description } = req.body;
@@ -440,7 +439,6 @@ app.post("/add-feedback", async (req, res) => {
   }
 });
 
-// Update feedback
 app.post("/update-feedback", async (req, res) => {
   try {
     const { id, description, status } = req.body;
@@ -452,7 +450,6 @@ app.post("/update-feedback", async (req, res) => {
   }
 });
 
-// Delete feedback
 app.post("/delete-feedback", async (req, res) => {
   try {
     const { id } = req.body;
@@ -464,7 +461,6 @@ app.post("/delete-feedback", async (req, res) => {
   }
 });
 
-// Bulk delete feedback
 app.post("/delete-selected-feedback", async (req, res) => {
   try {
     // Split the comma-separated string into an array
@@ -537,6 +533,97 @@ app.post("/change-password", async (req, res) => {
   res.redirect("/login");
 }
 });
+
+
+/////////Booking Management Routes
+app.get('/bookings', async (req, res) => {
+    if (req.isAuthenticated()) {
+      try {
+        // Get the email from session (or you can use another auth method)
+        const email = req.session.email || null;
+  
+        // Get reference to the 'bookings' collection in Firestore
+        const bookingsCollectionRef = collection(db, 'bookings');
+  
+        // Fetch the bookings documents from Firestore
+        const snapshot = await getDocs(bookingsCollectionRef);
+  
+        // If no bookings are found, return a 404 response
+        if (snapshot.empty) {
+          return res.status(404).send("No bookings found");
+        }
+  
+        // Map the snapshot to an array of booking objects
+        const bookings = snapshot.docs.map(doc => ({
+          id: doc.id, // Firestore document ID
+          ...doc.data() // Firestore document data
+        }));
+  
+        // Render the booking data to the EJS template (or send it as a response)
+        res.render('bookings.ejs', { bookings, email }); // Rendering the bookings page
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Error retrieving bookings data.");
+      }
+    } else {
+      // Redirect to login if user is not authenticated
+      res.redirect('/login');
+    }
+  });
+
+app.delete("/deleteBooking/:id", async (req, res) => {
+    const bookingId = req.params.id;
+  
+    try {
+      // Get reference to the specific booking document
+      const bookingRef = doc(db, "bookings", bookingId);
+      const bookingDoc = await getDoc(bookingRef);
+  
+      // If the booking doesn't exist, return an error
+      if (!bookingDoc.exists()) {
+        console.log(`Booking with ID ${bookingId} not found.`);
+        return res.status(404).json({ error: "Booking not found" });
+      }
+  
+      // Delete the booking document from Firestore
+      await deleteDoc(bookingRef);
+      console.log(`Booking with ID ${bookingId} deleted successfully.`);
+      res.status(200).json({ message: "Booking deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      res.status(500).json({ error: "Failed to delete the booking" });
+    }
+  });
+
+// Bulk delete bookings (handling each booking deletion individually)
+app.delete("/bulkbookingsdelete", async (req, res) => {
+  try {
+    const { bookingIds } = req.body; // Extract the bookingIds from the request body
+
+    // Check if bookingIds is provided and contains elements
+    if (!bookingIds || bookingIds.length === 0) {
+      return res.status(400).json({ error: "No booking IDs provided for deletion." });
+    }
+
+    // Iterate over the bookingIds and delete each one
+    for (const bookingId of bookingIds) {
+      const bookingRef = doc(db, "bookings", bookingId);
+      await deleteDoc(bookingRef);
+    }
+
+    res.status(200).json({ message: "Bookings deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting bookings:", error);
+    res.status(500).json({ error: "An error occurred while deleting bookings." });
+  }
+});
+
+
+
+  
+  
+  
+  
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
