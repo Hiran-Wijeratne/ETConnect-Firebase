@@ -645,6 +645,10 @@ function onDateChange($datepickerElement) {
 	$submitButton.prop('disabled', true);
 }
 
+function onDateChangeAdmin($datepickerElement) {
+	const selectedAdminDate = $datepickerElement.val().trim();
+	$('#hiddenDate').val(selectedAdminDate);
+}
 
 
 // Select the room and timeslot dropdowns using jQuery
@@ -1681,7 +1685,7 @@ function toggleAllFeedbacks() {
   }
   
   // Show the edit form with feedback data populated
-  function showEditFeedbackForm(feedbackId) {
+function showEditFeedbackForm(feedbackId) {
 	const row = document.querySelector(`tr[data-feedback-id="${feedbackId}"]`);
   
 	if (row) {
@@ -1717,4 +1721,171 @@ function toggleAllFeedbacks() {
   document.querySelector(".bg-blue-500").addEventListener("click", showCreateFeedbackForm);
   
 
+
+
+
+
+
+
+
+  /////Unavailable-Date Management 
+  // Toggle all date checkboxes
+function toggleAllDates() {
+	const bulkSelectAll = document.getElementById("bulk-select-all");
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox");
+	checkboxes.forEach((checkbox) => {
+		checkbox.checked = bulkSelectAll.checked;
+	});
+	toggleDeleteDateButton();
+}
+
+// Toggle delete button visibility
+function toggleDeleteDateButton() {
+	const checkboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+	const deleteButton = document.getElementById("deleteButton");
+	deleteButton.style.display = checkboxes.length > 0 ? "inline-block" : "none";
+}
+
+// Bulk delete dates
+async function deleteSelectedDates() {
+	const selectedCheckboxes = document.querySelectorAll(".bulk-select-checkbox:checked");
+	const dateIds = Array.from(selectedCheckboxes).map((checkbox) => checkbox.value);
+  
+	if (dateIds.length === 0) {
+	  alert("No dates selected for deletion.");
+	  return;
+	}
+  
+	if (!confirm(`Are you sure you want to delete ${dateIds.length} dates?`)) {
+	  return;
+	}
+  
+	try {
+	  // Convert the array to a comma-separated string
+	  const dateIdsString = dateIds.join(',');
+  
+	  // Send a DELETE request to the backend with the URL-encoded data
+	  const response = await fetch('/unavailable_dates_bulk', {
+		method: 'DELETE',
+		headers: {
+		  'Content-Type': 'application/x-www-form-urlencoded',  // Form encoding
+		},
+		body: new URLSearchParams({
+		  dateIds: dateIdsString,  // Send the selected date IDs as a comma-separated string
+		}),
+	  });
+  
+	  if (response.ok) {
+		alert("Selected dates deleted successfully!");
+		window.location.reload(); // Reload the page to reflect changes
+	  } else {
+		const data = await response.json();
+		alert(`Error: ${data.error}`);
+	  }
+	} catch (error) {
+	  console.error("Error deleting dates:", error);
+	  alert("An error occurred while deleting the dates.");
+	}
+  }
+  
+  
+  
+
+// Individual delete
+function deleteDate(dateId) {
+	// Confirm the deletion action with the user
+	const confirmation = confirm("Are you sure you want to delete this date?");
+	if (!confirmation) {
+		return;
+	}
+
+	// Make an HTTP DELETE request to the server
+	fetch(`/unavailable_dates/${dateId}`, {
+		method: "DELETE",
+	})
+		.then((response) => {
+			if (!response.ok) {
+				throw new Error("Failed to delete the date.");
+			}
+			return response.json();
+		})
+		.then((data) => {
+			// Remove the date row from the table in the DOM
+			const dateRow = document.querySelector(`[data-date-id="${dateId}"]`);
+			if (dateRow) dateRow.remove();  // Ensure dateRow exists before removing it
+
+			alert("Date deleted successfully!");
+		})
+		.catch((error) => {
+			console.error(error);
+			alert("An error occurred while trying to delete the date.");
+		});
+}
+
+// Show the edit form with date data populated
+function showEditDateForm(dateId) {
+	const row = document.querySelector(`tr[data-date-id="${dateId}"]`);
+  
+	if (!row) {
+	  console.error("Date row not found!");
+	  alert("The date row was not found.");
+	  return;
+	}
+  
+	// Select the 2nd and 3rd <td> elements directly based on their position
+	const dateCell = row.querySelector(".date-column"); // Date cell
+	const nameCell = row.querySelectorAll("td")[2]; // 3rd td is the Name cell
+  
+	// Ensure both cells are found
+	if (!dateCell || !nameCell) {
+	  console.error("Date or Name cell not found!");
+	  alert("The necessary data cells are missing.");
+	  return;
+	}
+
+	// Convert dd/mm/yyyy to yyyy-mm-dd for input type="date"
+    const [day, month, year] = dateCell.innerText.split('/');
+    const formattedDate = `${day}-${month}-${year}`; // Convert to dd-mm-yyyy
+  
+	document.getElementById("editDateId").value = dateId;
+	document.getElementById("datepicker").value = formattedDate;
+	document.getElementById("hiddenDate").value = formattedDate;
+	document.getElementById("editDateName").value = nameCell.innerText;
+  
+	const form = document.getElementById("editDateForm");
+	form.action = `/unavailable-date/${dateId}`;
+	document.getElementById("editFormContainer").classList.remove("hidden");
+  }
+  
+
+// Close the edit form
+function closeEditDateForm() {
+	document.getElementById("editFormContainer").classList.add("hidden");
+}
+
+// Show the Create Date Form
+function showCreateDateForm() {
+	document.getElementById("createFormContainer").classList.remove("hidden");
+}
+
+// Close the Create Date Form
+function closeCreateDateForm() {
+	document.getElementById("createFormContainer").classList.add("hidden");
+}
+
+// Bind the create button to show the create form
+document.querySelector(".bg-blue-500").addEventListener("click", showCreateDateForm);
+
+// Function to format dates as dd/mm/yyyy
+function formatDateToDDMMYYYY(date) {
+    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return new Date(date).toLocaleDateString('en-GB', options); // 'en-GB' ensures dd/mm/yyyy format
+}
+
+// Apply formatting to all date cells
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".date-column").forEach(cell => {
+        cell.innerText = formatDateToDDMMYYYY(cell.innerText);
+    });
+});
 

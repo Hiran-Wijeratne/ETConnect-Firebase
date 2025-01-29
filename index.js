@@ -80,6 +80,15 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///Admin Panel Related Code
 
@@ -318,7 +327,7 @@ app.post("/update-user/:userId", async (req, res) => {
 
     if (emailExists) {
       req.flash("error", "The updated email already exists. Please try a different email.");
-      return res.redirect("/users");
+      return res.redirect(`/users?errorMessage=${encodeURIComponent("The updated email already exists. Please try a different email.")}`);  
     }
 
     // Update the user document
@@ -620,12 +629,137 @@ app.delete("/bulkbookingsdelete", async (req, res) => {
 
 
 
+
+//////////Unavailable Date Management Routes
+app.get('/unavailable-dates', async (req, res) => {
+  if (req.isAuthenticated()) {
+  try {
+    const email = req.session.email || null;
+    const snapshot = await getDocs(collection(db, 'unavailable_dates'));
+    const unavailableDates = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    res.render('unavailableDates.ejs', { unavailableDates, email });
+  } catch (error) {
+    console.error("Error fetching unavailable dates:", error);
+    res.status(500).json({ error: "An error occurred while fetching unavailable dates." });
+  }
+} else {
+  // Redirect to login if user is not authenticated
+  res.redirect('/login');
+}
+});
+
+app.delete("/unavailable_dates/:id", async (req, res) => {
+  const { id } = req.params; // Date ID passed in URL
+
+  try {
+    // Reference to the "unavailable_dates" document
+    const unavailableDateRef = doc(db, "unavailable_dates", id);
+
+    // Delete the document
+    await deleteDoc(unavailableDateRef);
+
+    res.status(200).json({ message: "Date deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting date:", err);
+    res.status(500).json({ error: "Unable to delete the date" });
+  }
+});
+
+// Bulk delete route
+app.delete("/unavailable_dates_bulk", async (req, res) => {
+  const { dateIds } = req.body;  // Get the comma-separated list of date IDs from the request body
+  const dateIdArray = dateIds.split(',');  // Split the string into an array
+
+  if (!Array.isArray(dateIdArray) || dateIdArray.length === 0) {
+    return res.status(400).json({ error: "No date IDs provided for deletion." });
+  }
+
+  try {
+    // Delete dates in parallel
+    const deletePromises = dateIdArray.map(async (dateId) => {
+      const dateRef = doc(db, "unavailable_dates", dateId);
+      await deleteDoc(dateRef);  // Delete each date from Firestore
+    });
+
+    // Wait for all delete operations to complete
+    await Promise.all(deletePromises);
+
+    res.status(200).json({ message: `${dateIdArray.length} dates deleted successfully.` });
+  } catch (err) {
+    console.error("Error deleting dates:", err);
+    res.status(500).json({ error: "An error occurred while deleting the dates." });
+  }
+});
+
+// PUT route to update an unavailable date (for the edit functionality)
+app.post("/unavailable-date/:id", async (req, res) => {
+  const { id } = req.params; // Date ID passed in URL
+  const { date, name } = req.body; // New date and name to update
+
+  try {
+    // Reference to the "unavailable_dates" document
+    const unavailableRef = doc(db, "unavailable_dates", id);
+    
+    // Get the document
+    const unavailableDoc = await getDoc(unavailableRef);
+
+    // Check if the document exists
+    if (!unavailableDoc.exists()) {
+      return res.status(404).json({ error: "Date not found" });
+    }
+
+    // Update the document fields
+    await updateDoc(unavailableRef, {
+      date: date,
+      name: name,
+    });
+
+    res.redirect("/unavailable-dates");
+  } catch (err) {
+    console.error("Error updating date:", err);
+    res.status(500).json({ error: "Unable to update the date" });
+  }
+});
+
+// POST route to create a new unavailable date (for the create form)
+app.post("/unavailable_dates_create", async (req, res) => {
+  try {
+      const { date, name } = req.body;
+
+      if (!date || !name) {
+          return res.status(400).json({ error: "Date and name are required" });
+      }
+
+      // Add new unavailable date to Firestore
+      const docRef = await addDoc(collection(db, "unavailable_dates"), {
+          date,
+          name
+      });
+
+      res.redirect("/unavailable-dates");
+  } catch (error) {
+      console.error("Error adding unavailable date:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
   
   
   
   
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
 
 
 
