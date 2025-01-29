@@ -640,6 +640,7 @@ app.get('/unavailable-dates', async (req, res) => {
       id: doc.id,
       ...doc.data()
     }));
+    
     res.render('unavailableDates.ejs', { unavailableDates, email });
   } catch (error) {
     console.error("Error fetching unavailable dates:", error);
@@ -756,6 +757,24 @@ app.post("/unavailable_dates_create", async (req, res) => {
 
 
 
+app.use(async (req, res, next) => {
+  try {
+    const snapshot = await getDocs(collection(db, 'unavailable_dates'));
+
+    // Convert dates to "dd-MM-yyyy" format
+    const unavailableDatesList = snapshot.docs.map(doc => {
+      const rawDate = doc.data().date; // Ensure this is a valid date string
+      return moment(rawDate, 'YYYY-MM-DD').format('DD-MM-YYYY');
+    });
+
+    res.locals.unavailableDatesList = unavailableDatesList;
+  } catch (error) {
+    console.error("Error fetching unavailable dates:", error);
+    res.locals.unavailableDatesList = [];
+  }
+
+  next();
+});
 
 
 
@@ -1067,32 +1086,42 @@ passport.use("local",
   })
 );
 
-passport.use("google", new GoogleStrategy({ // google strategy also have to have uid to sequalize the user
+passport.use("google", new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: "https://your-app-url.com/auth/google/callback",
+  callbackURL: "http://localhost:3000/auth/google/callback",
   userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
 }, async (accessToken, refreshToken, profile, cb) => {
   try {
     const email = profile.emails[0].value;
 
-    // Check if the user exists in Firestore
+    // Check if the user already exists in Firestore
     const userQuerySnapshot = await getDocs(query(collection(db, "users"), where("email", "==", email)));
 
-    if (userQuerySnapshot.empty) {
-      // If the user doesn't exist, create a new user
-      await addDoc(collection(db, "users"), {
+    let user;
+    if (!userQuerySnapshot.empty) {
+      // User exists, retrieve their data
+      const userDoc = userQuerySnapshot.docs[0];
+      user = { uid: userDoc.id, ...userDoc.data() };
+    } else {
+      // Create new user in Firestore
+      const newUserRef = await addDoc(collection(db, "users"), {
         email: email,
-        password: "google",  // Assign a default password (you may not need this)
-        role: "user",        // Default role can be changed
-        createdAt: new Date(),
+        password: null,  // No password needed for OAuth users
+        role: "user",  // Default role
+        createdAt: moment().format("YYYY-MM-DD HH:mm:ss")  // Use moment to format timestamp
       });
+
+      // Update the user with Firestore-generated UID
+      await updateDoc(newUserRef, { uid: newUserRef.id });
+
+      user = { uid: newUserRef.id, email: email, role: "user" };
     }
 
-    return cb(null, { email: email, role: "user" }); // Return user object for passport
+    return cb(null, user);  // Return user object for passport
 
   } catch (err) {
-    console.log(err);
+    console.error("Error in Google OAuth strategy:", err);
     return cb(err);
   }
 }));

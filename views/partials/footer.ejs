@@ -132,6 +132,8 @@
 <!-- Datepicker Javascript -->
 <script>
 
+   const fullyBookedDates = <%- JSON.stringify(unavailableDatesList) %>;
+
    var today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
    var $datepicker = $('#datepicker').datepicker({
       footer: true,
@@ -143,7 +145,7 @@
       uiLibrary: 'bootstrap5',
       iconsLibrary: 'fontawesome',
       minDate: today,
-      // disableDates: fullyBookedDates,
+      disableDates: fullyBookedDates,
       change: function (e) {
         // Call a global function when the date changes
         onDateChange($(this));
