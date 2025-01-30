@@ -944,12 +944,32 @@ app.get("/auth/google",
   })
 );
 
-app.get("/auth/google/callback",
-  passport.authenticate("google", {
-    successRedirect: "/",
-    failureRedirect: "/login",
-  })
+// app.get("/auth/google/callback",
+//   passport.authenticate("google", {
+//     successRedirect: "/",
+//     failureRedirect: "/login",
+//   })
+// );
+
+app.get("/auth/google/callback", 
+  passport.authenticate("google", { failureRedirect: "/login" }), 
+  (req, res) => {
+    if (!req.user) {
+      req.flash("error", "Google login failed. Please try again.");
+      return res.redirect("/login");
+    }
+
+    req.session.email = req.user.email;
+
+    // Redirect based on user role
+    if (req.user.role === "superadmin") {
+      return res.redirect("/dashboard");
+    }
+
+    return res.redirect("/");
+  }
 );
+
 
 app.get("/confirmation", async (req, res) => {
   res.render("confirmation.ejs");
@@ -1007,8 +1027,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-app.post(
-  "/login",
+app.post("/login",
   (req, res, next) => {
     passport.authenticate("local", (err, user, info) => {
       if (err) {
@@ -1089,7 +1108,7 @@ passport.use("local",
 passport.use("google", new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: "http://localhost:3000/auth/google/callback",
+  callbackURL: process.env.GOOGLE_CALLBACK_URL,
   userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
 }, async (accessToken, refreshToken, profile, cb) => {
   try {

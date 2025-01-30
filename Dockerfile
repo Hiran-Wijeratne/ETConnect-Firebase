@@ -8,9 +8,9 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --build-from-source
+RUN npm install --omit=dev --build-from-source
 
-# Copy the rest of your app's source code
+# Copy the rest of the application source code
 COPY . .
 
 # Expose the port your app runs on
