@@ -8,6 +8,8 @@ services:
     ports:
       - "8081:3000"  # Map container's port 3000 to host's port 8081
     environment:
-      - GOOGLE_CALLBACK_URL=http://localhost:8081/auth/google/callback
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}  # Load from .env file
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     env_file:
-      - .env  # Use your .env file
+      - .env  # Use your .env file to load all environment variables
