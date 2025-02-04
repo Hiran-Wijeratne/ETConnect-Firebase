@@ -474,6 +474,22 @@ $(document).ready(function () {
 			const startDate = new Date(`${formattedDate}T${startTimeWithSeconds}`);
 			const endDate = new Date(`${formattedDate}T${endTimeWithSeconds}`);
 
+			const generateColorFromId = (id) => {
+				let hash = 0;
+				for (let i = 0; i < id.length; i++) {
+					hash = id.charCodeAt(i) + ((hash << 5) - hash);
+				}
+				const color = `hsl(${hash % 360}, 70%, 70%)`; // Generate HSL color for variety
+				return color;
+			};
+
+			const generateTextColor = (bgColor) => {
+				// Extract HSL lightness to adjust text color based on background
+				const lightness = parseInt(bgColor.match(/\d+, \d+%, (\d+)%/)[1]);
+				return lightness > 60 ? '#000000' : '#FFFFFF';  // Dark text for light backgrounds and vice versa
+			};
+			
+
 
 			// Create the event object
 			const event = {
@@ -482,6 +498,10 @@ $(document).ready(function () {
 				end: endDate,
 				description: booking.description,
 				room: booking.room,
+				room_id:booking.room_id,
+				backgroundColor: generateColorFromId(booking.room_id), // Set color based on booking_id
+        		borderColor: generateColorFromId(booking.room_id),  
+				textColor: generateTextColor(generateColorFromId(booking.room_id)) // Ensure text is readable
 			};
 
 			console.log("Mapped Event:", event); // Log each event for debugging
@@ -495,6 +515,7 @@ $(document).ready(function () {
 			calendarInstance = new FullCalendar.Calendar(calendarEl, {
 				initialView: 'dayGridMonth',
 				events: calendarEvents, // Use the processed events
+				eventDisplay: 'block',
 				headerToolbar: {
 					left: 'prev,next today',
 					center: 'title',
@@ -526,6 +547,8 @@ $(document).ready(function () {
 					$('#modalEnd').text(event.end ? event.end.toLocaleString() : 'N/A');
 					$('#modalAttendees').text(event.extendedProps.room || 'No room details');
 					$('#modalDescription').text(event.extendedProps.description || 'No description');
+					$('#modalRoomID').text(event.extendedProps.room_id || 'No Room ID'); // Add this line
+				
 
 					// Show the modal
 					$('#eventModal').modal('show');
@@ -539,8 +562,19 @@ $(document).ready(function () {
 					const startTime = info.event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 					const endTime = info.event.end ? info.event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : 'N/A';
 
-					const content = document.createElement('div');
-					content.innerHTML = `<strong>${shortTitle}</strong><br>${startTime} - ${endTime}`;
+					// Get the room name from the event's extended properties
+    				const roomName = info.event.extendedProps.room || 'No Room Info';
+
+    				// Create the event content
+   					const content = document.createElement('div');
+    				content.innerHTML = `
+        								<strong>${shortTitle}</strong><br>
+        								${startTime} - ${endTime}<br>
+        								<em>${roomName}</em>
+    																`;
+
+					// const content = document.createElement('div');
+					// content.innerHTML = `<strong>${shortTitle}</strong><br>${startTime} - ${endTime}`;
 
 					// Add a tooltip for the full title
 					content.title = fullTitle; // Tooltip to show the full title on hover

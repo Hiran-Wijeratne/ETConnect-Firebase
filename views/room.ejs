@@ -11,6 +11,19 @@
         <!-- Rooms Table -->
         <section class="bg-white p-6 rounded-lg shadow">
           <h2 class="text-lg font-bold">Room Management</h2>
+
+                    <!-- Display Flash Message -->
+                    <div class="mt-5"></div>
+                    <% if (locals.errorMessage && locals.errorMessage.length > 0) { %>
+                        <div class="mt-5"></div>
+                        <div
+                        class="error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+                        role="alert"
+                      >
+                            <span class="block sm:inline"><%= errorMessage %></span>
+                        </div>
+                        <div class="mt-5"></div>
+                      <% } %>
           <div class="overflow-x-auto">
             <table class="table-auto w-full mt-4 border-collapse border border-gray-300">
               <thead>

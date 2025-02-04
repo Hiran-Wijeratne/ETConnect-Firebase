@@ -106,6 +106,7 @@ app.get("/dashboard", (req, res) => {
 
 app.get("/room", async (req, res) => {
   if (req.isAuthenticated()) {
+  const errorMessage = req.query.errorMessage; 
   try {
     // Get a reference to the 'meeting_rooms' collection
     const email = req.session.email || null;
@@ -126,7 +127,7 @@ app.get("/room", async (req, res) => {
     }));
 
     // Pass the rooms data to the EJS template
-    res.render("room.ejs", { rooms, email });
+    res.render("room.ejs", { rooms, email, errorMessage });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error retrieving rooms data.");
@@ -137,22 +138,72 @@ app.get("/room", async (req, res) => {
 });
 
 app.post('/update-room/:roomId', async (req, res) => {
-  const { roomId } = req.params; // Get roomId from the URL parameter
+  const { roomId } = req.params;
   const { roomName, capacity, facilities, availability } = req.body;
   console.log(availability);
 
   try {
-    // Convert availability to boolean
-    const isAvailable = availability === "true" ? true : false;
+    const roomRef = doc(db, "meeting_rooms", roomId);
+    const roomSnapshot = await getDoc(roomRef);
+
+    if (!roomSnapshot.exists()) {
+      return res.status(404).send("Room not found");
+    }
+
+    const existingRoomData = roomSnapshot.data();
+    const isAvailable = availability === "true";
     const numericCapacity = Number(capacity);
 
-    const roomRef = doc(db, "meeting_rooms", roomId);
+    // Check for duplicate room names (excluding the current room)
+    const roomsRef = collection(db, "meeting_rooms");
+    const duplicateQuery = query(roomsRef, where("name", "==", roomName));
+    const duplicateSnapshot = await getDocs(duplicateQuery);
+
+    let duplicateFound = false;
+    duplicateSnapshot.forEach(doc => {
+      if (doc.id !== roomId) {
+        duplicateFound = true; // Found another room with the same name
+      }
+    });
+
+    if (duplicateFound) {
+      console.error(`A room with the name "${roomName}" already exists.`);
+      return res.redirect(`/room?errorMessage=Room name "${roomName}" already exists.`);
+    }
+
+    // Check if the room name has changed
+    const roomNameChanged = existingRoomData.name !== roomName;
+
+    // Update room information
     await updateDoc(roomRef, {
       name: roomName,
       capacity: numericCapacity,
       facilities: facilities || "Nil",
-      available: isAvailable, // Store boolean value
+      available: isAvailable,
     });
+
+    console.log(`Room "${roomId}" updated successfully.`);
+
+    // If the room name has changed, update all related bookings
+    if (roomNameChanged) {
+      const bookingsRef = collection(db, "bookings");
+      const bookingsQuery = query(bookingsRef, where("room_id", "==", roomId));
+      const bookingsSnapshot = await getDocs(bookingsQuery);
+
+      if (!bookingsSnapshot.empty) {
+        const updatePromises = [];
+
+        bookingsSnapshot.forEach((bookingDoc) => {
+          const bookingRef = doc(db, "bookings", bookingDoc.id);
+          updatePromises.push(updateDoc(bookingRef, { room_name: roomName }));
+        });
+
+        await Promise.all(updatePromises);
+        console.log(`Updated ${updatePromises.length} bookings with the new room name.`);
+      } else {
+        console.log("No bookings found for this room.");
+      }
+    }
 
     res.redirect("/room");
   } catch (error) {
@@ -166,19 +217,28 @@ app.post("/create-room", async (req, res) => {
 
   try {
     // Convert availability to boolean
-    const isAvailable = availability === "true" ? true : false;
+    const isAvailable = availability === "true";
     const numericCapacity = Number(capacity);
+
+    // Check if a room with the same name already exists
+    const roomsRef = collection(db, "meeting_rooms");
+    const duplicateQuery = query(roomsRef, where("name", "==", roomName));
+    const duplicateSnapshot = await getDocs(duplicateQuery);
+
+    if (!duplicateSnapshot.empty) {
+      console.error(`A room with the name "${roomName}" already exists.`);
+      return res.redirect(`/room?errorMessage=Room name "${roomName}" already exists.`);
+    }
 
     // Add the new room to the Firestore collection
     const newRoom = {
       name: roomName,
       capacity: numericCapacity,
-      facilities: facilities || "Nil", // Default to "None" if no facilities provided
+      facilities: facilities || "Nil", // Default to "Nil" if no facilities provided
       available: isAvailable,
     };
 
-    // Get a reference to the 'meeting_rooms' collection and add the new document
-    await addDoc(collection(db, "meeting_rooms"), newRoom);
+    await addDoc(roomsRef, newRoom);
 
     // Redirect to the room management page after successfully creating the room
     res.redirect("/room");
@@ -1194,6 +1254,7 @@ app.get("/bookinglist", async (req, res) => {
           start_time: data.starttime || 'N/A',
           end_time: data.endtime || 'N/A',
           description: data.des || data.description || 'No description',
+          room_id: data.room_id || 'N/A',  // Include room_id here
           room: data.room_name ? data.room_name.replace(/\s*\(.*?\)\s*/g, '').trim() : 'N/A',
           booking_date: data.created_at
             ? (data.created_at.toDate
@@ -1537,16 +1598,16 @@ app.post('/next', async (req, res) => {
 
   try {
     // Fetch room details from Firestore
-    const roomDoc = await getDoc(doc(db, 'meeting_rooms', room_id));
-    if (!roomDoc.exists()) {
-      console.error('Room not found for room_id:', room_id);
-      return res.status(400).send('Room not found');
-    }
+    // const roomDoc = await getDoc(doc(db, 'meeting_rooms', room_id));
+    // if (!roomDoc.exists()) {
+    //   console.error('Room not found for room_id:', room_id);
+    //   return res.status(400).send('Room not found');
+    // }
 
-    const roomName = `${roomDoc.data().name}`;
+    // const roomName = `${roomDoc.data().name}`;
 
     // Validate roomName and formattedDate
-    if (!formattedDate || !roomName) {
+    if (!formattedDate || !room_id) {
       console.error('Invalid query parameters:', { formattedDate, roomName });
       return res.status(400).send('Invalid query parameters');
     }
@@ -1556,7 +1617,7 @@ app.post('/next', async (req, res) => {
     const bookingsQuery = query(
       bookingsRef,
       where('date', '==', formattedDate),
-      where('room_name', '==', roomName)
+      where('room_id', '==', room_id)
     );
 
     const bookingsSnapshot = await getDocs(bookingsQuery);

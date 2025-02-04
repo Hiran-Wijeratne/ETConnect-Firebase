@@ -184,6 +184,9 @@
     console.log("Fetched Firestore data:", querySnapshot);
 
     let defaultRoomId = "<%= booking.room_id %>"; // Booking's room_id
+    let roomsAvailable = false; 
+
+    roomSelect.innerHTML = "";
 
     if (querySnapshot.empty) {
       console.log("No rooms available in Firestore");
@@ -195,16 +198,21 @@
     querySnapshot.forEach((doc) => {
       const roomData = doc.data();
       console.log("Room Data:", roomData);  // Log the room data for each document
+      if (roomData.available) {
+      roomsAvailable = true;
+
       const option = document.createElement('option');
       option.value = doc.id;
-      option.text = roomData.name || "No Name";
+      const capacityText = roomData.capacity ? ` (Capacity ${roomData.capacity})` : ""; // Add capacity if available
+      option.text = `${roomData.name || "No Name"}${capacityText}`; // Display name and capacity in the dropdown
 
       roomSelect.appendChild(option);
 
-      // Set default selection based on the booking's room_id
+      // Set default selection if no room is selected
       if (doc.id === defaultRoomId) {
         option.selected = true;
       }
+    }
     });
 
     // Reinitialize Nice Select (if necessary)

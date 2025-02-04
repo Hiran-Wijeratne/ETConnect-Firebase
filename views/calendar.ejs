@@ -190,8 +190,16 @@
                         const startTime = info.event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
                         const endTime = info.event.end ? info.event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : 'N/A';
 
-                        const content = document.createElement('div');
-                        content.innerHTML = `<strong>${shortTitle}</strong><br>${startTime} - ${endTime}`;
+                        // Get the room name from the event's extended properties
+    				const roomName = info.event.extendedProps.room || 'No Room Info';
+
+                        // Create the event content
+                    const content = document.createElement('div');
+                    content.innerHTML = `
+                        <strong>${shortTitle}</strong><br>
+                        ${startTime} - ${endTime}<br>
+                        <em>${roomName}</em>
+                                                `;
 
                         // Add a tooltip for the full title
                         content.title = fullTitle; // Tooltip to show the full title on hover
