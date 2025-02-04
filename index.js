@@ -1105,44 +1105,44 @@ passport.use("local",
   })
 );
 
-passport.use("google", new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: process.env.GOOGLE_CALLBACK_URL,
-}, async (accessToken, refreshToken, profile, cb) => {
-  try {
-    const email = profile.emails[0].value;
+// passport.use("google", new GoogleStrategy({
+//   clientID: process.env.GOOGLE_CLIENT_ID,
+//   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+//   callbackURL: process.env.GOOGLE_CALLBACK_URL,
+// }, async (accessToken, refreshToken, profile, cb) => {
+//   try {
+//     const email = profile.emails[0].value;
 
-    // Check if the user already exists in Firestore
-    const userQuerySnapshot = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+//     // Check if the user already exists in Firestore
+//     const userQuerySnapshot = await getDocs(query(collection(db, "users"), where("email", "==", email)));
 
-    let user;
-    if (!userQuerySnapshot.empty) {
-      // User exists, retrieve their data
-      const userDoc = userQuerySnapshot.docs[0];
-      user = { uid: userDoc.id, ...userDoc.data() };
-    } else {
-      // Create new user in Firestore
-      const newUserRef = await addDoc(collection(db, "users"), {
-        email: email,
-        password: null,  // No password needed for OAuth users
-        role: "user",  // Default role
-        createdAt: moment().format("YYYY-MM-DD HH:mm:ss")  // Use moment to format timestamp
-      });
+//     let user;
+//     if (!userQuerySnapshot.empty) {
+//       // User exists, retrieve their data
+//       const userDoc = userQuerySnapshot.docs[0];
+//       user = { uid: userDoc.id, ...userDoc.data() };
+//     } else {
+//       // Create new user in Firestore
+//       const newUserRef = await addDoc(collection(db, "users"), {
+//         email: email,
+//         password: null,  // No password needed for OAuth users
+//         role: "user",  // Default role
+//         createdAt: moment().format("YYYY-MM-DD HH:mm:ss")  // Use moment to format timestamp
+//       });
 
-      // Update the user with Firestore-generated UID
-      await updateDoc(newUserRef, { uid: newUserRef.id });
+//       // Update the user with Firestore-generated UID
+//       await updateDoc(newUserRef, { uid: newUserRef.id });
 
-      user = { uid: newUserRef.id, email: email, role: "user" };
-    }
+//       user = { uid: newUserRef.id, email: email, role: "user" };
+//     }
 
-    return cb(null, user);  // Return user object for passport
+//     return cb(null, user);  // Return user object for passport
 
-  } catch (err) {
-    console.error("Error in Google OAuth strategy:", err);
-    return cb(err);
-  }
-}));
+//   } catch (err) {
+//     console.error("Error in Google OAuth strategy:", err);
+//     return cb(err);
+//   }
+// }));
 
 app.get("/bookinglist", async (req, res) => {
   try {
@@ -1430,7 +1430,7 @@ app.post('/edit', async (req, res) => {
         return res.status(404).send("Room not found");
       }
       const roomData = roomDoc.data();
-      const room_name = `${roomData.name} (Capacity: ${roomData.capacity})`;
+      const room_name = `${roomData.name}`;
 
       // Step 2: Update the booking details in Firestore
       const bookingRef = doc(db, "bookings", bookingId);
@@ -1542,7 +1542,7 @@ app.post('/next', async (req, res) => {
       return res.status(400).send('Room not found');
     }
 
-    const roomName = `${roomDoc.data().name} (Capacity: ${roomDoc.data().capacity})`;
+    const roomName = `${roomDoc.data().name}`;
 
     // Validate roomName and formattedDate
     if (!formattedDate || !roomName) {
@@ -1616,7 +1616,7 @@ app.post('/submit', async (req, res) => {
         if (roomDoc.exists()) {
           const roomData = roomDoc.data();
           const capacity = roomData.capacity || "Unknown"; // Fetch room capacity (default "Unknown" if not available)
-          roomName = `${roomData.name} (Capacity: ${capacity})`; // Combine room name and capacity
+          roomName = `${roomData.name}`; // Combine room name and capacity
         }
       }
 
@@ -1664,7 +1664,7 @@ app.post('/submit', async (req, res) => {
         date: formattedDate,
         startTime: start,
         endTime: end,
-        room: roomName || "Room 1",
+        room: roomName,
         purpose: purpose,
       }).toString();
 
