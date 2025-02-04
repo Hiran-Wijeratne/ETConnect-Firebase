@@ -413,7 +413,7 @@ input[type="submit"].read_bt_submit_button:disabled:hover {
     background-color: #94c0c8; /* Red background */
     color: white; /* White text */
     border: none; /* No border */
-    opacity: 0.7; /* Make past events slightly transparent */
+    opacity: 0.35; /* Make past events slightly transparent */
 }
 
 
