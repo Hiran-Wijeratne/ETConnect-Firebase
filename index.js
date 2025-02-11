@@ -1793,7 +1793,7 @@ app.get('/calendarPage', async (req, res) => {
           end_time: data.endtime || 'N/A',
           description: data.des || data.description || 'No description',
           room_id: data.room_id || 'N/A',  // Include room_id here
-          room: data.room_name ? data.room_name.replace(/\[.*?\]|\(.*?\)/g, '').split(' ').slice(0, 2).join(' ') : '2',
+          room: data.room_name,
           booking_date: moment(data.created_at).format("DD-MM-YYYY"),
           status: status // Add status field to track whether booking is past or upcoming+
         };
